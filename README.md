@@ -3,6 +3,8 @@
 * urls
 * items
 
+## Firefox bookmark tables
+There are mainly two tables *urls* and *items* which contains url and title.
 ### Sqlite items table
 ```sql
 CREATE TABLE items(
