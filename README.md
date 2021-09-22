@@ -4,7 +4,9 @@
 * items
 
 ## Firefox bookmark tables
-There are mainly two tables *urls* and *items* which contains url and title.
+### Location on macOS Big Sur 11.5.2
+* `~/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/weave/bookmarks.sqlite`
+* There are mainly two tables *urls* and *items* which contains url and title.
 ### Sqlite items table
 ```sql
 CREATE TABLE items(
