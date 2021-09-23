@@ -218,7 +218,14 @@ queryBookMarkInfo dbFile = do
         pp $ "len=" ++ (sw. len) ffbm
         let ls = filter (\x -> ffHashx x /= 0) ffbm
         return ls
-        
+
+refillEmptyTitle:: String -> String -> String
+refillEmptyTitle t u = if (null . trim) t then
+                         if (upperStr $ takeEnd 5 u) == ".HTML" then takeName $ dropEnd 5 u else takeName u
+                       else
+                         t
+
+                    
 main = do
         home <- getEnv "HOME"
         -- run "sqlite_copy_firefox_to_testfile.sh"
@@ -230,15 +237,23 @@ main = do
         -- pre $ map ffId urlInfo
         -- pre $ map ffURL urlInfo
         let st = toSText
-        let html = map (\x -> let url = ffURLx x
-                                  title = ffTitlex x
-                                  href = st "<a href='" <> url <> st "'>" <> title <> st "</a><br>" 
-                              in href
-                       ) ls
-        let lsStr = map toStr html
-        let ps = partList 4 lsStr
+        let html = map (\x -> let title  = ffTitlex x
+                                  url    = ffURLx x
+                                  title' = refillEmptyTitle (toStr title) (toStr url)
+                                  -- htitle = st "<p>" <> title' <> st "</p>"
+                                  href   = st "<a href='" <> url <> st "'>" <> st title' <> st "</a><br>" 
+                                in (st title', (length . trim) title', href)
+                       ) ls  -- [(title, href)]
+        let sortedHtml = qqsort (\x y -> let
+                                           s1 = t1 x
+                                           s2 = t1 y
+                                         in s1 < s2
+                                ) html
+        pre sortedHtml
+        let lsStr' = map (toStr . t3) sortedHtml
+        let ps = partList 2 lsStr'
         let pt = htmlTable ps
-        let htmlFile = "/tmp/x.html"
+        htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
         writeFileList htmlFile pt
         pp $ "Generate html => " ++ htmlFile
         pp "done!"
