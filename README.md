@@ -1,14 +1,17 @@
 # haskell-bookmark-manager
 # 
 ### sqlite database table
-* urls
-* items
+	* urls
+	* items
 
 ## Firefox bookmark tables
-### Location on macOS Big Sur 11.5.2
-* `~/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/weave/bookmarks.sqlite`
-* There are mainly two tables *urls* and *items* which contains url and title<br>
+## Location on macOS Big Sur 11.5.2
+
+	* `~/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/weave/bookmarks.sqlite`
+	* There are mainly two tables *urls* and *items* which contains url and title
+
 ### Sqlite table: items
+
 ```sql
 CREATE TABLE items(
     id INTEGER PRIMARY KEY,
@@ -37,10 +40,13 @@ CREATE TABLE items(
 CREATE INDEX itemURLs ON items(urlId);
 CREATE INDEX itemKeywords ON items(keyword)
                     WHERE keyword NOT NULL;
+
 ```
-<br>
-* We only use *id*, *dateAdded*, *urlId* from *items* table and ignore the rest <br>
+
+* We only use *id*, *dateAdded*, *urlId* from *items* table and ignore the rest
 ### Sqlite table: urls
+
+
 ``` sql
 CREATE TABLE urls(
     id INTEGER PRIMARY KEY,
@@ -56,3 +62,8 @@ CREATE INDEX urlHashes ON urls(hash);
 ## Update:
 * file:///Users/aaa/myfile/github/notshare/bookmark.html
 * Add: sorted title
+
+### Update Monday, 18 October 2021 13:09 PDT
+
+
+
