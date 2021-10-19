@@ -59,18 +59,35 @@ CREATE INDEX urlHashes ON urls(hash);
 ```
 * Similarily above, we only use *id*, *url* and *hash* from urls table
 
-## Update:
-* file:///Users/aaa/myfile/github/notshare/bookmark.html
-* Add: sorted title
-* Add: sorted date
-* Add: svg icon to text title
-
 ## Add package lens to cabal file, use len to access item in tuple
 ``` haskell
 	:set -package lens
 	import Control.Lens
 	>(1, 2, 3)^._3  -- 3
 ```
+## What I learned today?
+### You can not use annotation like the following
+
+``` haskell
+    import Data.Text
+	main = do
+	       let ls = ["a"]::Text
+		   print "ok"
+		   
+    -- You get compile error
+	-- You have to convert String to Text with function
+	-- "" only for String
+```
+
+
+## Update:
+* file:///Users/aaa/myfile/github/notshare/bookmark.html
+* Add: sorted title
+* Add: sorted date
+* Add: svg icon to text title
+* Add: filter to remove some useless *title* from Firefox
+
+
 
 
 

@@ -182,6 +182,10 @@ mkFFBookMarkAll =  FFBookMarkAll{ ttIdx = 0
                                 , dateAddedx = 0
                                 , ffHashx = 0
                                 }
+
+
+  
+
   
 queryBookMarkInfo::String -> IO[FFBookMarkAll]
 queryBookMarkInfo dbFile = do
@@ -218,7 +222,16 @@ queryBookMarkInfo dbFile = do
         pre ffbm
         pp $ "len=" ++ (sw. len) ffbm
         let ls = filter (\x -> ffHashx x /= 0) ffbm
-        return ls
+
+        let dells = map toSText ["About Us", "Customize Firefox", "Get Involved", "Help and Tutorials"]
+        let ls' = rms dells ls
+              where
+                rmls a cx = filter(\x -> ffTitlex x /= a) cx
+        
+                rms [] ss = ss
+                rms (x:cs) ss = rms cs (rmls x ss)
+                
+        return ls'
 
 refillEmptyTitle:: String -> String -> String
 refillEmptyTitle t u = if (null . trim) t then
@@ -228,7 +241,7 @@ refillEmptyTitle t u = if (null . trim) t then
 
 
 
-                    
+
 main = do
         home <- getEnv "HOME"
         -- run "sqlite_copy_firefox_to_testfile.sh"
@@ -246,11 +259,11 @@ main = do
                                   img    = toSText "<img src='svg/code.svg' alt='img' style='width:20px;height:20px;'>"
                                   -- htitle = st "<p>" <> title' <> st "</p>"
                                   href   = toSText "<a href='" <> url <> toSText "'>" <> img <> toSText title' <> toSText "</a><br>" 
-                                in (toSText title', (length . trim) title', href, date)
+                                in (toSText title', (len . trim) title', href, date)
                        ) ls  -- [(title, href)]
         let sortedHtml = qqsort (\x y -> let
-                                           s1 = x^._1
-                                           s2 = y^._1
+                                           s1 = x^._1  -- fst (a, b)
+                                           s2 = y^._1  
                                          in s1 < s2
                                 ) html
         
@@ -260,7 +273,7 @@ main = do
                                          in s2 < s1
                                 ) sortedHtml
         pre sortedHtml
-        let lsStr' = map (\x -> toStr (x ^._3)) sortedHtml'
+        let lsStr' = map (\x -> toStr (x^._3)) sortedHtml'
         let ps = partList 2 lsStr'
         let pt = htmlTable ps
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
