@@ -83,4 +83,5 @@ executable             haskell-bookmark-manager
                        uri-encode,
                        pretty-terminal,
                        strict-io,
-                       ghci-websockets
+                       ghci-websockets,
+                       lens

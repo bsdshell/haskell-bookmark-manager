@@ -286,6 +286,17 @@
   (major1) == 1 && (major2) == 5 && (minor) <= 1)
 #endif /* MIN_VERSION_io_streams */
 
+/* package lens-4.17.1 */
+#ifndef VERSION_lens
+#define VERSION_lens "4.17.1"
+#endif /* VERSION_lens */
+#ifndef MIN_VERSION_lens
+#define MIN_VERSION_lens(major1,major2,minor) (\
+  (major1) <  4 || \
+  (major1) == 4 && (major2) <  17 || \
+  (major1) == 4 && (major2) == 17 && (minor) <= 1)
+#endif /* MIN_VERSION_lens */
+
 /* package linear-1.20.9 */
 #ifndef VERSION_linear
 #define VERSION_linear "1.20.9"
@@ -804,7 +815,7 @@
 #endif /* MIN_TOOL_VERSION_runghc */
 
 #ifndef CURRENT_COMPONENT_ID
-#define CURRENT_COMPONENT_ID "haskell-bookmark-manager-0.1.0.0-2LwwIsB2QhiGYcGor37D9L-haskell-bookmark-manager"
+#define CURRENT_COMPONENT_ID "haskell-bookmark-manager-0.1.0.0-AgI2XSWpNAKFbMPP0SFdJM-haskell-bookmark-manager"
 #endif /* CURRENT_COMPONENT_ID */
 #ifndef CURRENT_PACKAGE_VERSION
 #define CURRENT_PACKAGE_VERSION "0.1.0.0"

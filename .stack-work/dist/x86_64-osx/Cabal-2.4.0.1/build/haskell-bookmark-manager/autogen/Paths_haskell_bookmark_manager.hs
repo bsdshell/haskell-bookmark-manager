@@ -30,7 +30,7 @@ version = Version [0,1,0,0] []
 bindir, libdir, dynlibdir, datadir, libexecdir, sysconfdir :: FilePath
 
 bindir     = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/bin"
-libdir     = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/lib/x86_64-osx-ghc-8.6.5/haskell-bookmark-manager-0.1.0.0-2LwwIsB2QhiGYcGor37D9L-haskell-bookmark-manager"
+libdir     = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/lib/x86_64-osx-ghc-8.6.5/haskell-bookmark-manager-0.1.0.0-AgI2XSWpNAKFbMPP0SFdJM-haskell-bookmark-manager"
 dynlibdir  = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/lib/x86_64-osx-ghc-8.6.5"
 datadir    = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/share/x86_64-osx-ghc-8.6.5/haskell-bookmark-manager-0.1.0.0"
 libexecdir = "/Users/aaa/myfile/github/haskell-bookmark-manager/.stack-work/install/x86_64-osx/e4a1e3da1599055cfb106fd2d2765c8f6797bcd3520e32d5e09fa0cf6073c2a2/8.6.5/libexec/x86_64-osx-ghc-8.6.5/haskell-bookmark-manager-0.1.0.0"

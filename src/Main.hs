@@ -29,7 +29,8 @@ import Text.Regex.Base.RegexLike
 import Text.Regex.Posix
 import Data.IORef 
 import Control.Monad (unless, when)
-import Control.Concurrent 
+import Control.Concurrent
+import Control.Lens hiding (pre)
 
 import qualified Text.Regex.TDFA as TD
 
@@ -225,6 +226,8 @@ refillEmptyTitle t u = if (null . trim) t then
                        else
                          t
 
+
+
                     
 main = do
         home <- getEnv "HOME"
@@ -236,21 +239,28 @@ main = do
         pp $ "new len=" ++ (sw . len) ls
         -- pre $ map ffId urlInfo
         -- pre $ map ffURL urlInfo
-        let st = toSText
         let html = map (\x -> let title  = ffTitlex x
                                   url    = ffURLx x
                                   title' = refillEmptyTitle (toStr title) (toStr url)
+                                  date   = dateAddedx x
+                                  img    = toSText "<img src='svg/code.svg' alt='img' style='width:20px;height:20px;'>"
                                   -- htitle = st "<p>" <> title' <> st "</p>"
-                                  href   = st "<a href='" <> url <> st "'>" <> st title' <> st "</a><br>" 
-                                in (st title', (length . trim) title', href)
+                                  href   = toSText "<a href='" <> url <> toSText "'>" <> img <> toSText title' <> toSText "</a><br>" 
+                                in (toSText title', (length . trim) title', href, date)
                        ) ls  -- [(title, href)]
         let sortedHtml = qqsort (\x y -> let
-                                           s1 = t1 x
-                                           s2 = t1 y
+                                           s1 = x^._1
+                                           s2 = y^._1
                                          in s1 < s2
                                 ) html
+        
+        let sortedHtml'= qqsort (\x y -> let
+                                           s1 = x^._4
+                                           s2 = y^._4
+                                         in s2 < s1
+                                ) sortedHtml
         pre sortedHtml
-        let lsStr' = map (toStr . t3) sortedHtml
+        let lsStr' = map (\x -> toStr (x ^._3)) sortedHtml'
         let ps = partList 2 lsStr'
         let pt = htmlTable ps
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"

@@ -62,8 +62,15 @@ CREATE INDEX urlHashes ON urls(hash);
 ## Update:
 * file:///Users/aaa/myfile/github/notshare/bookmark.html
 * Add: sorted title
+* Add: sorted date
+* Add: svg icon to text title
 
-### Update Monday, 18 October 2021 13:09 PDT
+## Add package lens to cabal file, use len to access item in tuple
+``` haskell
+	:set -package lens
+	import Control.Lens
+	>(1, 2, 3)^._3  -- 3
+```
 
 
 
