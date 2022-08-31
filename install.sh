@@ -54,8 +54,8 @@ getpwd
 # getName -> $ff/mybin/getName  is Haskell code
 mybin=$HOME/myfile/mybin
 fname=$(getName $PWD)
-dir=${fname}Bin
-bindir=$mybin/$dir
+dir="${fname}Bin"
+bindir="$mybin/$dir"
 
 printc 200 "[fname=$fname]"
 printc 200 "[dir=$dir]"
@@ -77,6 +77,8 @@ if [[ "$#" -eq 2 ]]; then
         rm $sym/$fname
 
         ln -s $bindir/$fname $2
+        echo "=>$bindir/$fname"
+        
         ls -lah $mybin
         ls -lah $sym | grep $fname
 

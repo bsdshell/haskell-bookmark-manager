@@ -3,6 +3,7 @@
 -- #!/usr/bin/env runhaskell -i/Users/cat/myfile/bitbucket/haskelllib
 -- {-# LANGUAGE OverloadedStrings #-}
 -- {-# LANGUAGE DuplicateRecordFields #-} 
+{-# LANGUAGE MultiWayIf #-} 
 -- import Turtle
 -- echo "turtle"
 
@@ -56,7 +57,6 @@ import           Database.SQLite.Simple.Ok
 import AronModule
 import AronAlias
   
-p1 = "/Users/cat/myfile/bitbucket/testfile/test.tex"
 sw = show
 
 -- zo - open
@@ -97,20 +97,28 @@ CREATE TABLE items(
     /* The creation date, in milliseconds. */
     dateAdded INTEGER NOT NULL DEFAULT 0,
     title TEXT,
-    urlId INTEGER REFERENCES urls(id)
-                  ON DELETE SET NULL,
+
+    urlId INTEGER REFERENCES urls(id) ON DELETE SET NULL,
+                                ↑  
+                                + → TABLE urls
+                                       ↓ 
+                                       + → id INTEGER PRIMARY KEY
+                                     
     keyword TEXT,
     description TEXT,
     loadInSidebar BOOLEAN,
     smartBookmarkName TEXT,
     feedURL TEXT,
     siteURL TEXT
-j  );
+  );
 CREATE INDEX itemURLs ON items(urlId);
 CREATE INDEX itemKeywords ON items(keyword)
                     WHERE keyword NOT NULL;
 CREATE TABLE urls(
     id INTEGER PRIMARY KEY,
+     ↑ 
+     + → foreign key in TABLE items
+
     guid TEXT NOT NULL,
     url TEXT NOT NULL,
     hash INTEGER NOT NULL,
@@ -118,14 +126,20 @@ CREATE TABLE urls(
   );
 CREATE INDEX urlHashes ON urls(hash);
 
-
 urlId INTEGER REFERENCES urls(id)
               ON DELETE SET NULL,
 =>
 
-If row in urls is deleted from urls table, then
-uriId will be set to NULL in items table
+NOTE:
+    If row in TABLE(urls) is deleted from urls table, then
+    uriId will be set to NULL in items table
 
+    If row of urls is deleted then all urlId = NULL should be deleted from TABLE(items)
+
+    DELETE FROM items WHERE urlId IS NULL;
+
+Delete title contains string using LIKE, IN:
+    DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));
 -}
   
 data FFurls = FFurls
@@ -183,100 +197,395 @@ mkFFBookMarkAll =  FFBookMarkAll{ ttIdx = 0
                                 , ffHashx = 0
                                 }
 
+selectItemsTitleHas::String -> String -> IO [FFurls]
+selectItemsTitleHas s dbFile = do 
+        conn <- open dbFile
+        let ss = "%" ++ s ++ "%"::String
+        let sql_select = Query {fromQuery = toSText qStr }
+        urlInfo <- query conn sql_select (Only ss) :: IO [FFurls]
+        return urlInfo
+    where
+      -- qStr = "DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));"
+      -- qStr = "SELECT id, url, hash FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%APL%'));"
+      -- qStr = "SELECT id, url, hash FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE ? ));"
+      qStr = "SELECT id, url, hash FROM urls WHERE id IN (SELECT urlId FROM items X WHERE title LIKE ? );"
 
-  
+selectURLHas::String -> String -> IO [FFurls]
+selectURLHas s dbFile = do
+        conn <- open dbFile
+        let ss = "%" ++ s ++ "%"::String
+        let sql_select = Query {fromQuery = toSText qStr }
+        urlInfo <- query conn sql_select (Only ss) :: IO [FFurls]
+        return urlInfo
+    where
+      -- qStr = "DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));"
+      -- qStr = "SELECT id, url, hash FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%APL%'));"
+      qStr = "SELECT id, url, hash FROM urls WHERE url LIKE ? ;"
 
-  
+selectURLHasX::String -> String -> IO [FFBookMarkAll]
+selectURLHasX s dbFile = queryBookMarkInfoX s "" dbFile 
+
+{-|
+    data FFurls = FFurls
+      { ffId :: Int64
+      , ffURL :: TS.Text
+      , ffHash :: Int64
+      } deriving (Eq,Read,Show)
+-}
+printURLInfo::[FFurls] -> IO()
+printURLInfo u = do
+        mapM_ (\x -> let uid = show $ ffId x
+                         emp = " "
+                         url = toStr $ ffURL x 
+                     in putStrLn $ emp <> url <> emp <> "[" <> uid <> "]"
+              ) u
+      where
+        (+) = (++)
+{-|
+    Delete row from urls table where title of TABLE(items) contains Str 
+-}
+deleteURLFromItemsTitleHas::String -> String -> IO () 
+deleteURLFromItemsTitleHas s dbFile = do 
+        conn <- open dbFile
+        -- ss = "%Str%" 
+        let ss = "%" ++ s ++ "%" :: String
+        let sql_delete = Query {fromQuery = toSText "DELETE FROM urls WHERE id IN (SELECT urlId FROM items X WHERE title LIKE ? );"} 
+        -- qStr = "DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));"
+        execute conn sql_delete (Only ss) 
+        let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
+        execute conn delRowItem () 
+        return ()
+
+deleteURLMatchURL::String -> String -> IO()
+deleteURLMatchURL s dbFile = do
+        conn <- open dbFile
+        -- ss = "%Str%" 
+        let ss = "%" ++ s ++ "%" :: String
+        let sql_delete = Query {fromQuery = toSText "DELETE FROM urls WHERE url LIKE ?"} 
+        -- qStr = "DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));"
+        execute conn sql_delete (Only ss) 
+        let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
+        execute conn delRowItem () 
+        return ()
+
+
+{-|
+    TODO: Pass search str to the function
+
+    @
+    let sql_select = Query {fromQuery = toSText "SELECT id, url, hash FROM urls"}
+    @ 
+-}
 queryBookMarkInfo::String -> IO[FFBookMarkAll]
 queryBookMarkInfo dbFile = do
         conn <- open dbFile
         let sql_select = Query {fromQuery = toSText "SELECT id, url, hash FROM urls"}
         urlInfo <- query_ conn sql_select ::IO [FFurls]
-        pre urlInfo
+        -- pre urlInfo
         let tit = toSText "ok"
         let qq = Query {fromQuery = toSText "SELECT urlId, title, dateAdded FROM items WHERE urlId = :urlId"}
         pp "test rows"
-        ffbm <- mapM (\urlinfo -> do
-                          -- let id = ffId urlinfo
-                          let urlIdx = ffId urlinfo :: Int64
-                          let urlName = ffURL urlinfo :: TS.Text
-                          let hash = ffHash urlinfo :: Int64
+        ffbm <- mapM (\uinfo -> do
+                          -- let id = ffId uinfo
+                          let urlIdx = ffId uinfo :: Int64
+                          let urlName = ffURL uinfo :: TS.Text
+                          let hash = ffHash uinfo :: Int64
                           rowTitle <- queryNamed conn qq [ (toSText ":urlId") := urlIdx ]::IO[FFItems]
                           if (not . null) rowTitle then do
-                              pp $ "hash=" ++ (sw hash)
-                              pre urlName
-                              pre rowTitle
-                              let ffBoobMarkAll = FFBookMarkAll{ ttIdx = urlIdx
+                              -- pp $ "hash=" ++ (sw hash)
+                              -- pre urlName
+                              -- pre rowTitle
+                              let ffBookMarkAll = FFBookMarkAll{ ttIdx = urlIdx
                                                                , ffURLx = urlName
                                                                , ffTitlex = (ffTitle . head) rowTitle
                                                                , dateAddedx = (dateAdded . head) rowTitle
-                                                               , ffHashx = ffHash urlinfo
+                                                               , ffHashx = ffHash uinfo
                                                                }
-                              return ffBoobMarkAll                                 
+                              return ffBookMarkAll                                 
                             else do
-                            pp $ (sw urlIdx) ++ " does not contains data"
+                            -- pp $ (sw urlIdx) ++ " does not contains data"
                             return mkFFBookMarkAll
                              
              ) urlInfo
         fl
-        pre ffbm
-        pp $ "len=" ++ (sw. len) ffbm
+        -- pre ffbm
+        -- pp $ "len=" ++ (sw. len) ffbm
         let ls = filter (\x -> ffHashx x /= 0) ffbm
 
-        let dells = map toSText ["About Us", "Customize Firefox", "Get Involved", "Help and Tutorials"]
-        let ls' = rms dells ls
+        let deleteBuiltin = map toSText ["About Us", "Customize Firefox", "Get Involved", "Help and Tutorials"]
+        let ls' = rms deleteBuiltin ls
               where
-                rmls a cx = filter(\x -> ffTitlex x /= a) cx
+                rmTitle a cx = filter(\x -> ffTitlex x /= a) cx
         
                 rms [] ss = ss
-                rms (x:cs) ss = rms cs (rmls x ss)
+                rms (x:cs) ss = rms cs (rmTitle x ss)
                 
         return ls'
 
+queryBookMarkInfoX::String -> String -> String -> IO[FFBookMarkAll]
+queryBookMarkInfoX us ts dbFile = do
+        conn <- open dbFile
+        let urlS = if (not . null) us then " WHERE url LIKE " + "'%" + us + "%';" else us 
+        let titleS = if (not . null) ts then " AND title LIKE " + "'%" + ts + "%';" else ts
+        let sql_select = Query {fromQuery = toSText $ " SELECT id, url, hash FROM urls" + urlS}
+        urlInfo <- query_ conn sql_select ::IO [FFurls]
+        -- pre urlInfo
+        let tit = toSText "ok"
+        let qq = Query {fromQuery = toSText $ "SELECT urlId, title, dateAdded FROM items WHERE urlId = :urlId " + titleS}
+        pp "test rows"
+        ffbm <- mapM (\uinfo -> do
+                          -- let id = ffId uinfo
+                          let urlIdx = ffId uinfo :: Int64
+                          let urlName = ffURL uinfo :: TS.Text
+                          let hash = ffHash uinfo :: Int64
+                          rowTitle <- queryNamed conn qq [ (toSText ":urlId") := urlIdx ]::IO[FFItems]
+                          if (not . null) rowTitle then do
+                              -- pp $ "hash=" ++ (sw hash)
+                              -- pre urlName
+                              -- pre rowTitle
+                              let ffBookMarkAll = FFBookMarkAll{ ttIdx = urlIdx
+                                                               , ffURLx = urlName
+                                                               , ffTitlex = (ffTitle . head) rowTitle
+                                                               , dateAddedx = (dateAdded . head) rowTitle
+                                                               , ffHashx = ffHash uinfo
+                                                               }
+                              return ffBookMarkAll                                 
+                            else do
+                            -- pp $ (sw urlIdx) ++ " does not contains data"
+                            return mkFFBookMarkAll
+                             
+             ) urlInfo
+        fl
+        -- pre ffbm
+        -- pp $ "len=" ++ (sw. len) ffbm
+        let ls = filter (\x -> ffHashx x /= 0) ffbm
+
+        let deleteBuiltin = map toSText ["About Us", "Customize Firefox", "Get Involved", "Help and Tutorials"]
+        let ls' = rms deleteBuiltin ls
+              where
+                rmTitle a cx = filter(\x -> ffTitlex x /= a) cx
+        
+                rms [] ss = ss
+                rms (x:cs) ss = rms cs (rmTitle x ss)
+                
+        return ls'
+    where
+      (+) = (++)
+
 refillEmptyTitle:: String -> String -> String
-refillEmptyTitle t u = if (null . trim) t then
-                         if (upperStr $ takeEnd 5 u) == ".HTML" then takeName $ dropEnd 5 u else takeName u
-                       else
-                         t
+refillEmptyTitle str u = if (null . trim) str then
+                            if (upperStr $ takeEnd nChar u) == htmlExt then takeName $ dropEnd nChar u else takeName u
+                         else str 
+            where
+                htmlExt = ".HTML"
+                nChar = len htmlExt 
 
 
+{-|
+    data FFBookMarkAll = FFBookMarkAll
+      { ttIdx :: Int64
+      , ffURLx :: TS.Text
+      , ffTitlex :: TS.Text
+      , dateAddedx::Int64
+      , ffHashx :: Int64
+      } deriving (Eq,Read,Show)
+-}
+printBookMarkInfo::String -> IO()
+printBookMarkInfo dbFile = do 
+    ffBookMarkAll <- queryBookMarkInfo dbFile
+    let ls = partList 30 ffBookMarkAll
+    let ls' = (map) (\x -> zip [1..] x) ls
+    mapM_ (\ss -> do
+            mapM_ (\(n, bm) -> do
+                            let url = toStr $ ffURLx bm 
+                            let title = toStr $ ffTitlex bm 
+                            let color = colorfgStr
+                            let s = url + (red " → ") + title 
+                            let s' = colorfgStr 2 s 
+                            if mod n 2 == 0 then putStrLn s else putStrLn s'
+                  ) ss 
+            s <- getLine
+            putStrLn s
+            clear
+            setCursorPos 10 1 
+          ) ls'
+    putStrLn $ " Len=" ++ (show $ len ffBookMarkAll)
+  where
+    (+) = (++)
+    red = colorfgStr 9
 
+printBookMarkInfoX::[FFBookMarkAll]-> IO()
+printBookMarkInfoX ffBookMarkAll = do 
+    let ls = partList 30 ffBookMarkAll
+    let ls' = (map) (\x -> zip [1..] x) ls
+    mapM_ (\ss -> do
+            mapM_ (\(n, bm) -> do
+                            let url = toStr $ ffURLx bm 
+                            let title = toStr $ ffTitlex bm 
+                            let color = colorfgStr
+                            let s = url + (red " → ") + title 
+                            let s' = colorfgStr 10 s 
+                            if mod n 2 == 0 then putStrLn s else putStrLn s'
+                  ) ss 
+            s <- getLine
+            putStrLn s
+            clear
+            setCursorPos 10 1 
+          ) ls'
+    putStrLn $ " Len=" ++ (show $ len ffBookMarkAll)
+  where
+    (+) = (++)
+    red = colorfgStr 9
+
+
+urlInfoToList::String -> IO [[String]]
+urlInfoToList dbFile = do 
+                ls <- queryBookMarkInfo dbFile 
+                -- pre ls
+                pp $ "new len=" ++ (sw . len) ls
+                -- pre $ map ffId urlInfo
+                -- pre $ map ffURL urlInfo
+                let html = map (\x -> let title  = ffTitlex x
+                                          url    = ffURLx x
+                                          title' = refillEmptyTitle (toStr title) (toStr url)
+                                          date   = dateAddedx x
+                                          img    = toSText "<img src='svg/code.svg' alt='img' style='width:20px;height:20px;'>"
+                                          -- htitle = st "<p>" <> title' <> st "</p>"
+                                          href   = toSText "<a href='" <> url <> toSText "'>" <> img <> toSText title' <> toSText "</a><br>" 
+                                        in (toSText title', (len . trim) title', href, date)
+                               ) ls  -- [(title, href)]
+                let sortedHtml = qqsort (\x y -> let
+                                                   s1 = x^._1  -- fst (a, b)
+                                                   s2 = y^._1  
+                                                 in s1 < s2
+                                        ) html
+                
+                let sortedHtml'= qqsort (\x y -> let
+                                                   s1 = x^._4
+                                                   s2 = y^._4
+                                                 in s2 < s1
+                                        ) sortedHtml
+                -- pre sortedHtml
+                let lsStr' = map (\x -> toStr (x^._3)) sortedHtml'
+                let ps = partList 2 lsStr'
+                -- let pt = htmlTable ps
+                return ps 
+
+helpMe::IO()
+helpMe = do
+    pr ["-h         → Help Menu"]
+    pr ["-t str     → List title contains str"]
+    pr ["-u str     → List URL contains str"]
+    pr ["-du str    → Delete URL contains str"]
+    pr ["-dt str    → Delete Title contains str"]
+  where
+    pr = printBox 2
 
 main = do
         home <- getEnv "HOME"
-        -- run "sqlite_copy_firefox_to_testfile.sh"
-        run "cpff"
+        args <- getArgs
         let dbFile = bmfile home
-        ls <- queryBookMarkInfo dbFile 
-        pre ls
-        pp $ "new len=" ++ (sw . len) ls
-        -- pre $ map ffId urlInfo
-        -- pre $ map ffURL urlInfo
-        let html = map (\x -> let title  = ffTitlex x
-                                  url    = ffURLx x
-                                  title' = refillEmptyTitle (toStr title) (toStr url)
-                                  date   = dateAddedx x
-                                  img    = toSText "<img src='svg/code.svg' alt='img' style='width:20px;height:20px;'>"
-                                  -- htitle = st "<p>" <> title' <> st "</p>"
-                                  href   = toSText "<a href='" <> url <> toSText "'>" <> img <> toSText title' <> toSText "</a><br>" 
-                                in (toSText title', (len . trim) title', href, date)
-                       ) ls  -- [(title, href)]
-        let sortedHtml = qqsort (\x y -> let
-                                           s1 = x^._1  -- fst (a, b)
-                                           s2 = y^._1  
-                                         in s1 < s2
-                                ) html
-        
-        let sortedHtml'= qqsort (\x y -> let
-                                           s1 = x^._4
-                                           s2 = y^._4
-                                         in s2 < s1
-                                ) sortedHtml
-        pre sortedHtml
-        let lsStr' = map (\x -> toStr (x^._3)) sortedHtml'
-        let ps = partList 2 lsStr'
-        let pt = htmlTable ps
-        htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
-        writeFileList htmlFile pt
-        pp $ "Generate html => " ++ htmlFile
-        pp "done!"
+        let ln = len args
+        case ln of  
+            var | var == 2 -> do
+                    let opt = head args
+                    let input = last args
+                    case opt of
+                         var | hasStr "-t" opt -> do
+                                ps <- urlInfoToList dbFile
+                                let pt = htmlTable ps 
+                                htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                                writeFileList htmlFile pt
+                                pp $ "Generate html => " ++ htmlFile
+
+
+                                ffBookMarkAll <- queryBookMarkInfoX [] input dbFile
+                                printBookMarkInfoX ffBookMarkAll 
+                                -- uInfo <- selectItemsTitleHas input dbFile
+                                -- printURLInfo uInfo
+
+                                pre args
+         
+                             | hasStr "-u" opt -> do
+                                ps <- urlInfoToList dbFile
+                                let pt = htmlTable ps 
+                                htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                                writeFileList htmlFile pt
+                                pp $ "Generate html => " ++ htmlFile
+
+                                ffBookMarkAll <- queryBookMarkInfoX input [] dbFile
+                                printBookMarkInfoX ffBookMarkAll 
+
+                                -- uInfo <- selectURLHas input dbFile
+                                -- printURLInfo uInfo
+                                pre args
+
+                             | hasStr "-du" opt -> do
+                                ps <- urlInfoToList dbFile
+                                let pt = htmlTable ps 
+                                htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                                writeFileList htmlFile pt
+                                pp $ "Generate html => " ++ htmlFile
+                                deleteURLMatchURL input dbFile
+                                pre args
+
+                             | hasStr "-dt" opt -> do
+                                ps <- urlInfoToList dbFile
+                                let pt = htmlTable ps 
+                                htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                                writeFileList htmlFile pt
+                                pp $ "Generate html => " ++ htmlFile
+                                deleteURLFromItemsTitleHas input dbFile
+                                pre args
+                             | otherwise -> do
+                                pp $ "Invalid Option => " ++ opt
+
+        {-|            
+                    if hasStr "-l" opt then do 
+                        -- run "sqlite_copy_firefox_to_testfile.sh"
+                        -- cpff -> /Users/aaa/myfile/bitbucket/script/sqlite_copy_firefox_to_testfile.sh
+                        -- run "cpff"
+
+                        ps <- urlInfoToList dbFile
+                        let pt = htmlTable ps 
+                        htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                        writeFileList htmlFile pt
+                        pp $ "Generate html => " ++ htmlFile
+                        pp "done!"
+                        fw "uInfo"
+                        uInfo <- selectItemsTitleHas input dbFile
+                        printURLInfo uInfo
+                        pre args
+                     else if hasStr "-u" opt then do
+                        ps <- urlInfoToList dbFile
+                        let pt = htmlTable ps 
+                        htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
+
+                        writeFileList htmlFile pt
+                        pp $ "Generate html => " ++ htmlFile
+                        pp "done!"
+                        fw "uInfo"
+                        uInfo <- selectURLHas input dbFile
+                        printURLInfo uInfo
+                        pre args
+                     else do 
+                       if hasStr "-dt" opt then do 
+                         deleteURLFromItemsTitleHas input dbFile 
+                         pp "kk"
+                       else do
+                         pp "ok"
+        -}
+
+                | var == 0 -> do 
+                    ffBookMarkAll <- queryBookMarkInfo dbFile
+                    printBookMarkInfoX ffBookMarkAll 
+                | var == 1 -> do
+                    let hs = head args
+                    if hasStr "-h" hs then helpMe else pp "Invalid Option"
+                | otherwise -> do
+                    pp "Otherwise"
