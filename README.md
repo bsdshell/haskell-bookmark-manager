@@ -87,16 +87,20 @@ CREATE INDEX urlHashes ON urls(hash);
 * Add: filter to remove some useless *title* from Firefox
 
 ## Update Mon 12 Sep 00:54:17 2022 
-### Change Sqlite3 table to: places.sqlite 
+### Change Sqlite3 database to: places.sqlite  :.table → moz_places and moz_bookmarks
 ``` sql
     bmfile h = h </> "Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite"
+
+    CREATE TABLE moz_places (   id INTEGER PRIMARY KEY, url LONGVARCHAR, title LONGVARCHAR, rev_host LONGVARCHAR, visit_count INTEGER DEFAULT 0, hidden INTEGER DEFAULT 0 NOT NULL, typed INTEGER DEFAULT 0 NOT NULL, frecency INTEGER DEFAULT -1 NOT NULL, last_visit_date INTEGER , guid TEXT, foreign_count INTEGER DEFAULT 0 NOT NULL, url_hash INTEGER DEFAULT 0 NOT NULL , description TEXT, preview_image_url TEXT, origin_id INTEGER REFERENCES moz_origins(id));
+
+    CREATE TABLE moz_bookmarks (  id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER DEFAULT NULL, parent INTEGER, position INTEGER, title LONGVARCHAR, keyword_id INTEGER, folder_type TEXT, dateAdded INTEGER, lastModified INTEGER, guid TEXT, syncStatus INTEGER NOT NULL DEFAULT 0, syncChangeCounter INTEGER NOT NULL DEFAULT 1);
 ```
-* Delete One URL using index
-* Delete Range of URLs using index
+* Delete one URL using index
+* Delete range of URLs using index
 * Search URL name
-* Search Title name
+* Search title name
 * Delete URL name contains matched pattern
-* Delete Title name contains matched pattern
+* Delete title name contains matched pattern
 
 
 
