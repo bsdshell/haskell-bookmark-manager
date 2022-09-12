@@ -79,7 +79,6 @@ CREATE INDEX urlHashes ON urls(hash);
 	-- "" only for String
 ```
 
-
 ## Update:
 * file:///Users/aaa/myfile/github/notshare/bookmark.html
 * Add: sorted title
@@ -87,7 +86,17 @@ CREATE INDEX urlHashes ON urls(hash);
 * Add: svg icon to text title
 * Add: filter to remove some useless *title* from Firefox
 
-
+## Update Mon 12 Sep 00:54:17 2022 
+### Change Sqlite3 table to: places.sqlite 
+``` sql
+    bmfile h = h </> "Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite"
+```
+* Delete One URL using index
+* Delete Range of URLs using index
+* Search URL name
+* Search Title name
+* Delete URL name contains matched pattern
+* Delete Title name contains matched pattern
 
 
 

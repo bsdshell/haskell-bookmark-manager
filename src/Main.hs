@@ -55,6 +55,7 @@ import           Database.SQLite.Simple.FromField
 import           Database.SQLite.Simple.ToField
 import           Database.SQLite.Simple.Internal
 import           Database.SQLite.Simple.Ok
+import           System.Console.Haskeline
 import AronModule
 import AronAlias
   
@@ -207,7 +208,10 @@ instance FromRow FFBookMarkAll where
 instance ToRow FFBookMarkAll where
    toRow (FFBookMarkAll _ttIdx ffURLx ffTitlex dateAddedx ffHashx) = toRow (ffURLx, ffTitlex, dateAddedx, ffHashx)
 
-bmfile h = h </> "myfile/bitbucket/testfile/firefox_bookmark_test.sqlite"
+-- bmfile h = h </> "myfile/bitbucket/testfile/firefox_bookmark_test.sqlite"
+-- bmfile h = "/Users/aaa/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/weave/bookmarks.sqlite"
+bmfile h = h </> "Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite"
+
 dbfile home = home </> "myfile/bitbucket/testfile/ShellHistory.db"
 hisFile home = home </> "myfile/bitbucket/shell/dot_bash_history_test"
 
@@ -285,11 +289,12 @@ deleteURLMatchURL s conn = do
         -- conn <- open dbFile
         -- ss = "%Str%" 
         let ss = "%" ++ s ++ "%" :: String
-        let sql_delete = Query {fromQuery = toSText "DELETE FROM urls WHERE url LIKE ?"} 
+        -- let sql_delete = Query {fromQuery = toSText "DELETE FROM urls WHERE url LIKE ?"} 
+        let sql_delete = Query {fromQuery = toSText "DELETE FROM moz_places WHERE url LIKE ?"} 
         -- qStr = "DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));"
         execute conn sql_delete (Only ss) 
-        let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
-        execute conn delRowItem () 
+        -- let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
+        -- execute conn delRowItem () 
         return ()
 
 {-|
@@ -305,10 +310,10 @@ deleteURLFromId (minPid,  maxPid) conn = do
         -- conn <- open dbFile
         let minPid' = fromIntegral minPid :: Int64
         let maxPid' = fromIntegral maxPid :: Int64
-        execute conn Query{fromQuery = toSText "DELETE FROM urls WHERE  ? <= id AND id <= ?;"} (minPid'::Int64, maxPid'::Int64)        
+        execute conn Query{fromQuery = toSText "DELETE FROM moz_places WHERE  ? <= id AND id <= ?;"} (minPid'::Int64, maxPid'::Int64)        
         
-        let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
-        execute conn delRowItem () 
+        -- let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
+        -- execute conn delRowItem () 
         return ()
 
 {-|
@@ -325,11 +330,11 @@ deleteURLAllId cx conn = do
         -- conn <- open dbFile
         mapM_ (\x -> do
                       let pid = fromIntegral x :: Int64
-                      execute conn Query{fromQuery = toSText "DELETE FROM urls WHERE  id = ?;"} ((Only pid))        
+                      execute conn Query{fromQuery = toSText "DELETE FROM moz_places WHERE  id = ?;"} ((Only pid))        
               ) cx
         
-        let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
-        execute conn delRowItem () 
+        -- let delRowItem = Query {fromQuery = toSText "DELETE FROM ITEMS where urlId IS NULL;"}
+        -- execute conn delRowItem () 
         return ()
 {-|
     TODO: Pass search str to the function
@@ -436,12 +441,21 @@ queryBookMarkInfoX us ts dbFile = do
 {-|
     Table urls and items
     INNER JOIN
+
+    ORDER BY B.dateAdded ASC
+                          ↑ 
+                          + → as - cent 
+    ORDER BY B.dateAdded DESC
+                          ↑ 
+                          + → des - cent
+                            
 -}
 queryURLAndTitle::String -> String -> Connection -> IO[FFBookMarkAll]
 queryURLAndTitle us ts conn = do 
         let ts' = if (not . null) ts then "%" + ts + "%" else "%"
         let us' = if (not . null) us then "%" + us + "%" else "%" 
-        let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId WHERE X.title LIKE ? AND U.url LIKE ? GROUP BY U.id;"}
+        -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId WHERE U.url LIKE ? AND X.title LIKE ? GROUP BY U.id;"}
+        let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND P.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;"}
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id;"}
         ffBookMarkAll <- query conn qStr (us', ts') ::IO [FFBookMarkAll]
         -- ffBookMarkAll <- query conn qStr () ::IO [FFBookMarkAll]
@@ -449,14 +463,50 @@ queryURLAndTitle us ts conn = do
     where
       (+) = (++)
 
+{-|
+
+    @
+    data FFBookMarkAll = FFBookMarkAll
+      { ttIdx :: Int64
+      , ffURLx :: TS.Text
+      , ffTitlex :: TS.Text
+      , dateAddedx::Int64
+      , ffHashx :: Int64
+      } deriving (Eq,Read,Show)
+    @
+-}
 queryURLNewest::Int -> Connection -> IO[FFBookMarkAll]
 queryURLNewest n conn = do
         let n' = fromIntegral n :: Int64
-        let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id ORDER BY X.dateAdded ASC LIMIT ?;"}
+        -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id ORDER BY X.dateAdded ASC LIMIT ?;"}
+        let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk GROUP BY P.id ORDER BY B.dateAdded DESC LIMIT ?;"}
+        -- let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON 2 = 2 LIMIT ?;"}
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id;"}
-        ffBookMarkAll <- query conn qStr (Only(n)) ::IO [FFBookMarkAll]
+        -- ffBookMarkAll <- query conn qStr (Only(n)) ::IO [FFBookMarkAll]
+        -- ffBookMarkAll <- query conn qStr (Only n) :: IO [(Int, TS.Text, TS.Text, Int, Int)]
+        ffBookMarkAll <- query conn qStr (Only n):: IO [(Int, TS.Text, Maybe TS.Text, Int, Int)]
+        ffb <- forM ffBookMarkAll $ \(pid, url, title, dateAdded, url_hash) ->  do
+            -- putStrLn $ "id=" ++ (show pid) 
+            putStrLn "forM_"
+            let ffb = FFBookMarkAll{
+                        ttIdx = fromIntegral pid,
+                        ffURLx = url,
+                        ffTitlex = case title of
+                                        Just x -> x
+                                        Nothing -> toSText "" 
+                                   ,
+                        dateAddedx = 0,
+                        ffHashx = 0
+                      }
+            return ffb
+--            case title of
+--                Just x -> putStrLn "title"
+--                Nothing -> putStrLn "nothing"
         -- ffBookMarkAll <- query conn qStr () ::IO [FFBookMarkAll]
-        return ffBookMarkAll 
+        -- return ffBookMarkAll 
+        return [mkFFBookMarkAll]
+        return ffb
+
     where
       (+) = (++)
 
@@ -523,13 +573,19 @@ printURL ts = do
 loopPage:: [(Int, FFBookMarkAll)] -> String -> Connection -> IO() 
 loopPage ss cmd conn = do
     clear
-    setCursorPos 10 0 
+
 
     let urlTuple = map (\(ix, bm) -> let pId = (fromIntegral . ttIdx) bm :: Int
                                          url = toStr $ ffURLx bm 
                                          title = toStr $ ffTitlex bm 
                                      in  (ix, pId, url, title)
                    ) ss
+
+
+    setCursorPos 6 0 
+    putStrLn $ toRightStr 10 ++ "Len=" + (show . len) ss
+
+    setCursorPos 12 0 
 
     let kvMap = M.fromList $ map (\(ix, pId, _, _) -> (ix, pId)) urlTuple 
     printURL urlTuple
@@ -682,8 +738,82 @@ iterateBookMark ffBookMarkAll dbFile = do
     (!) = (!!)
     red = colorfgStr 9
 
-iterateIndex::[[FFBookMarkAll]] -> Int -> String -> Connection -> IO()
-iterateIndex lsbm ix cmd conn = do
+
+cursorUpLine::Int -> IO()
+cursorUpLine n = do
+  let s = "\x1b[" + (show n) + "A"
+  putStr s
+ where
+   (+) = (++)
+  
+cursorDownLine::Int -> IO()
+cursorDownLine n = do
+  let s = "\x1b[" + (show n) + "B"
+  putStr s
+ where
+   (+) = (++)
+  
+{-|
+   Move cursor to Line #, Column #
+-}
+cursorToLC::Int -> Int -> IO()
+cursorToLC ln cn = do
+  let s = "\x1b[" + (show ln) + ";" + (show cn) + "H"
+  --                  ↑                  ↑ 
+  --                  + → line #         + → column #
+  putStr s
+ where
+   (+) = (++)
+
+cursorToColumn::Int -> IO()
+cursorToColumn n = do
+  let s = "\x1b[" + (show n) + "G"
+  putStr s
+ where
+   (+) = (++)
+  
+cursorToRightCol::Int -> IO()
+cursorToRightCol n = do
+  let s = "\x1b[" + (show n) + "C"
+  putStr s
+ where
+   (+) = (++)
+
+{-|
+    Move cursor to the right of n columns relative to current position
+-}
+toRightStr::Int -> String  
+toRightStr n = "\x1b[" ++ (show n) ++ "C"
+
+{-|
+    Move cursor to column #
+-}
+moveToColStr::Int -> String
+moveToColStr n = "\x1b[" ++ (show n) ++ "G"
+
+{-|
+    Move cursor to the left of n columns
+-}
+toLeft::Int -> String
+toLeft n = "\x1b[" ++ (show n) ++ "D"
+
+rightCol::Int -> String 
+rightCol n = "\x1b[" + (show n) + "C"
+ where
+   (+) = (++)
+  
+cursorToLeftCol::Int -> IO()
+cursorToLeftCol n = do
+  let s = "\x1b[" + (show n) + "D"
+  putStr s
+ where
+   (+) = (++)
+  
+mySettings :: Settings IO
+mySettings = defaultSettings {historyFile = Just "myhist"}
+
+iterateIndex::[[FFBookMarkAll]] -> Int -> [String] -> Connection -> IO()
+iterateIndex lsbm ix cx conn = do
     clear
     setCursorPos 10 0 
 
@@ -701,11 +831,29 @@ iterateIndex lsbm ix cmd conn = do
                    ) tuplePage
 
     let kvMap = M.fromList $ map (\(x, pid, _, _) -> (x, pid)) urlTuple 
+
+    (nline, ncol) <- getTerminalSize
+    let curLine   = div nline 2 
+    let curColumn = div ncol 2
+    setCursorPos 6 curColumn 
+    putStrLn $ (moveToColStr curColumn) ++ "Len =" ++ (show . len) lsbm 
+    putStrLn $ (moveToColStr curColumn) ++ "Page=" ++ (show (ix + 1)) 
+
+    setCursorPos 12 0 
+
     printURL urlTuple
+    cursorDownLine 5 
+    
+    when (not . null $ cx) $ do
+        -- pre cx 
+        mapM_ putStrLn cx 
 
+    -- setCursorPos 30 5 
+    let lc ln cn = "\x1b[" ++ (show ln) ++ ";" ++ (show cn) ++ "H"
 
-    pp "iterateIndex => getLine"
-    cmd <- getLine
+    putStrLn $ lc 50 5
+    putStr "ENTER "
+    cmd <- getLineFlush
     -- loopPage tuplePage cmd conn 
 
     let ls = splitSPC cmd 
@@ -713,19 +861,38 @@ iterateIndex lsbm ix cmd conn = do
         ln | ln == 1 -> do
                 let opt = head ls
                 case opt of
+                    opt | hasPrefix "-h" opt -> do
+                            home <- getEnv "HOME"
+                            let msg = let s1  = [ri ++ "-h           → Help Menu"]
+                                          s2  = [ri ++ "-t str       → List title contains str"]
+                                          s3  = [ri ++ "-u str       → List URL contains str"]
+                                          s4  = [ri ++ "-du str      → Delete URL contains str"]
+                                          s5  = [ri ++ "-dall 1 2 3  → Delete all 1 2 3 rows"]
+                                          s6  = [ri ++ "-de 1        → Delete one rows"]
+                                          s7  = [ri ++ "-dr 1 3      → Delete rows from 1 to 3"]
+                                          s8  = [ri ++ "-ne 10       → Query the newest 10 rows"]
+                                          s9  = [ri ++ "all          → Show all"]
+                                          s10 = [ri ++ "n            → Next page"]
+                                          s11 = [ri ++ "p            → Previous page"]
+                                          s12 = [ri ++ dbPath]
+                                          ri = toRightStr 10
+                                          dbPath = bmfile home
+                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12
+
+                            iterateIndex lsbm ix msg conn 
                     opt | hasPrefix "n" opt -> do
                             pp $ "Next Page (ix + 1) =>" ++ (show $ ix + 1)
                             if (ix + 1 < len lsbm) then do
-                                iterateIndex lsbm (ix + 1) cmd conn 
+                                iterateIndex lsbm (ix + 1) [] conn 
                             else do    
-                                iterateIndex lsbm ix cmd conn 
+                                iterateIndex lsbm ix [] conn 
 
                     opt | hasPrefix "p" opt -> do
                             pp $ "Previous Page (ix - 1) =>" ++ (show $ ix - 1)
                             if (0 <= ix - 1) then do
-                                iterateIndex lsbm (ix - 1) cmd conn 
+                                iterateIndex lsbm (ix - 1) [] conn 
                             else do
-                                iterateIndex lsbm ix cmd conn 
+                                iterateIndex lsbm ix [] conn 
 
                         | hasPrefix "all" opt -> do
                             ffBookMarkAll <- queryURLAndTitle [] [] conn 
@@ -749,11 +916,11 @@ iterateIndex lsbm ix cmd conn = do
                                 -- loopPage ss cmd conn 
                             else do
                                 pp $ "Invalid Index => 999" ++ sw inx
-                                -- loopPage ss cmd conn 
+                                iterateIndex lsbm ix [] conn
 
                         | otherwise -> do
                             pp $ "Invalid 1 argument ix =>" ++ (show ix)
-                            iterateIndex lsbm ix cmd conn 
+                            iterateIndex lsbm ix [] conn 
            | ln == 2 -> do
                 let opt = head ls
                 case opt of
@@ -786,6 +953,7 @@ iterateIndex lsbm ix cmd conn = do
                             let input = last ls 
                             deleteURLFromItemsTitleHas input conn 
                         | hasStr "-de" opt -> do
+                            -- Delete one row
                             let n = last ls 
                             let inx = read n :: Int64
                             let pid = fromJust $ M.lookup (fromIntegral inx) kvMap
@@ -802,7 +970,7 @@ iterateIndex lsbm ix cmd conn = do
 
                         | otherwise -> do
                             pp "ow"
-                iterateIndex lsbm ix cmd conn
+                iterateIndex lsbm ix [] conn
            | ln == 3 -> do
                 let opt = head ls
                 case opt of
@@ -815,8 +983,8 @@ iterateIndex lsbm ix cmd conn = do
                             pp "len arr > 1"
                             pre cx 
                             deleteURLAllId cx conn 
-                            iterateIndex lsbm ix cmd conn
-                        | hasStr "-de" opt -> do
+                            iterateIndex lsbm ix [] conn
+                        | hasPrefix "-dr" opt -> do
                             let minPid = case M.lookup (read $ (head . tail) ls :: Int) kvMap  of
                                               Just x  -> x
                                               Nothing -> error $ "Invalid minPid=" ++ (show ls) 
@@ -827,17 +995,29 @@ iterateIndex lsbm ix cmd conn = do
 
                             pp $ "minPid=" ++ (show minPid)
                             pp $ "maxPid=" ++ (show maxPid)
-                            deleteURLFromId (minPid, maxPid) conn 
+                            logFileG ["show midPid=" ++ (show minPid), "maxPid=" ++ (show maxPid)]
+                            let swapT (a, b) = (b, a)
+                            deleteURLFromId (swapT (minPid, maxPid)) conn 
+                            --                 ↑           ↑  
+                            --                 |           + →  ORDER BY dateAdded DESC 
+                            --                 + - - - - - + →  Need to swap (minPid, maxPid)
+                            --        Pid
+                            --   1 -> 003
+                            --   2 -> 002
+                            --   3 -> 001
+                            --
+                            -- SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND P.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;
+                            -- 
                             iterateIndex lsbm ix [] conn 
 
                         | otherwise -> do
-                            pp "99"
+                            pp "Invalid options"
+                            iterateIndex lsbm ix [] conn 
 
 
            | otherwise -> do
-                iterateIndex lsbm ix cmd conn 
+                iterateIndex lsbm ix [] conn 
                 pp "xx555"
-    pp "done"
   where
     (!) = (!!)
     isBound ls ix = 0 <= ix && ix < len ls
@@ -877,7 +1057,7 @@ urlInfoToList conn = do
 
 helpMe::IO()
 helpMe = do
-    pr ["-h         → Help Menu"]
+    pr ["-h         → Help Menukk"]
     pr ["-t str     → List title contains str"]
     pr ["-u str     → List URL contains str"]
     pr ["-du str    → Delete URL contains str"]
@@ -886,31 +1066,30 @@ helpMe = do
     pr = printBox 2
 
 main = do
-        home <- getEnv "HOME"
         args <- getArgs
         pre args
+        home <- getEnv "HOME"
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
         pp $ "Generate html => " ++ htmlFile
         let dbFile = bmfile home
         let ln = len args
+        -- let inputFunc = getInputLine
         conn <- open dbFile
         ffBookMarkAll <- queryURLAndTitle [] [] conn 
         let ls = partList 20 ffBookMarkAll
-        -- iterateBookMark ffBookMarkAll dbFile
-        iterateIndex ls 0 "" conn 
-{-|
-        case ln of  
-            var | var == 2 -> do
-                    pp $ "var == 2" ++ (show var) 
-                | var == 1 -> do
-                    let hs = head args
-                    if hasStr "-h" hs then helpMe else pp "Invalid Option"
-                | var == 0 -> do 
-                    -- ffBookMarkAll <- queryURLAndTitle "youtube" "lyrics" dbFile
-                    ffBookMarkAll <- queryURLAndTitle [] [] conn 
-                    let ls = partList 20 ffBookMarkAll
-                    -- iterateBookMark ffBookMarkAll dbFile
-                    iterateIndex ls 0 "" conn 
-                | otherwise -> do
-                    pp "Otherwise"
--}
+        iterateIndex ls 0 [] conn 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
