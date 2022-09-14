@@ -812,6 +812,8 @@ cursorToLeftCol n = do
 mySettings :: Settings IO
 mySettings = defaultSettings {historyFile = Just "myhist"}
 
+
+
 iterateIndex::[[FFBookMarkAll]] -> Int -> [String] -> Connection -> IO()
 iterateIndex lsbm ix cx conn = do
     clear
@@ -833,11 +835,11 @@ iterateIndex lsbm ix cx conn = do
     let kvMap = M.fromList $ map (\(x, pid, _, _) -> (x, pid)) urlTuple 
 
     (nline, ncol) <- getTerminalSize
-    let curLine   = div nline 2 
-    let curColumn = div ncol 2
-    setCursorPos 6 curColumn 
-    putStrLn $ (moveToColStr curColumn) ++ "Len =" ++ (show . len) lsbm 
-    putStrLn $ (moveToColStr curColumn) ++ "Page=" ++ (show (ix + 1)) 
+    let cenLine   = div nline 2 
+    let cenColumn = div ncol 2
+    setCursorPos 6 cenColumn 
+    putStrLn $ (moveToColStr cenColumn) ++ "All Pages| " ++ (show . len) lsbm 
+    putStrLn $ (moveToColStr cenColumn) ++ "Curr Page| " ++ (show (ix + 1)) 
 
     setCursorPos 12 0 
 
@@ -918,6 +920,9 @@ iterateIndex lsbm ix cx conn = do
                                 pp $ "Invalid Index => 999" ++ sw inx
                                 iterateIndex lsbm ix [] conn
 
+                        | hasPrefix "q" opt -> do 
+                            -- quit
+                            return ()
                         | otherwise -> do
                             pp $ "Invalid 1 argument ix =>" ++ (show ix)
                             iterateIndex lsbm ix [] conn 
