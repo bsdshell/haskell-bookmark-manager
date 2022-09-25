@@ -34,6 +34,8 @@ import Control.Concurrent
 import Control.Lens hiding (pre)
 import Data.Maybe (fromJust)
 import qualified Data.Map.Strict as M 
+import qualified Data.HashMap.Strict as MS
+
 import qualified Text.Regex.TDFA as TD
 
 --import Data.Array
@@ -211,10 +213,20 @@ instance ToRow FFBookMarkAll where
 -- bmfile h = h </> "myfile/bitbucket/testfile/firefox_bookmark_test.sqlite"
 -- bmfile h = "/Users/aaa/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/weave/bookmarks.sqlite"
 bmfile h = h </> "Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite"
+backupDir = "dbbackup"
 
 dbfile home = home </> "myfile/bitbucket/testfile/ShellHistory.db"
 hisFile home = home </> "myfile/bitbucket/shell/dot_bash_history_test"
 
+{-|
+    --  root/config.txt/src
+    os = Darwin
+    -- /Users/aaa/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite
+    -- places.sqlite is copied from Firefox App dir
+    -- When Firefox is running, places.sqlite is locked. Other process CAN NOT open/access the db file.
+    db_bookmark = /Users/aaa/myfile/github/notshare/places.sqlite
+-}
+configFile = "./config.txt"
 
 mkFFBookMarkAll::FFBookMarkAll
 mkFFBookMarkAll =  FFBookMarkAll{ ttIdx = 0
@@ -812,10 +824,30 @@ cursorToLeftCol n = do
 mySettings :: Settings IO
 mySettings = defaultSettings {historyFile = Just "myhist"}
 
+{-|
+    === KEY: backup file
 
+    @
+    Backup file:
+    places.sqlite ⟹  places.sqlite_2022-09-14_00_11_07_081807_PDT
+
+    backup "/tmp/x.txt"  "/tmp" => "/tmp/x.txt_2022-09-14_00_11_07_081807_PDT
+    @
+-}
+backup::FilePath -> FilePath -> IO () 
+backup dbFile newDir = do
+    s <- dateStr >>= \x -> return $ concatStr (splitSPC x) "_"
+    let s' = replaceRegex (mkRegex ":|\\.") s "_"
+    home <- getEnv "HOME"
+    let newName = (takeName dbFile) ++ "_" ++ s'
+    let dbFile' = "\"" ++ dbFile ++ "\""
+    b <- fileExistA newDir 
+    when (not b) $ do 
+        mkdir newDir
+    cp dbFile (newDir </> newName)
 
 iterateIndex::[[FFBookMarkAll]] -> Int -> [String] -> Connection -> IO()
-iterateIndex lsbm ix cx conn = do
+iterateIndex lsbm ix lsMsg conn = do
     clear
     setCursorPos 10 0 
 
@@ -845,11 +877,10 @@ iterateIndex lsbm ix cx conn = do
 
     printURL urlTuple
     cursorDownLine 5 
-    
-    when (not . null $ cx) $ do
-        -- pre cx 
-        mapM_ putStrLn cx 
 
+    when (not . null $ lsMsg) $ do
+        mapM_ putStrLn lsMsg
+    
     -- setCursorPos 30 5 
     let lc ln cn = "\x1b[" ++ (show ln) ++ ";" ++ (show cn) ++ "H"
 
@@ -876,10 +907,11 @@ iterateIndex lsbm ix cx conn = do
                                           s9  = [ri ++ "all          → Show all"]
                                           s10 = [ri ++ "n            → Next page"]
                                           s11 = [ri ++ "p            → Previous page"]
-                                          s12 = [ri ++ dbPath]
+                                          s12 = [ri ++ "backup dir   → " ++ backupDir]
+                                          s13 = [ri ++ "db path"]
+                                          s14 = [ri ++ "UPDATE: Sat 24 Sep 23:11:22 2022"]
                                           ri = toRightStr 10
-                                          dbPath = bmfile home
-                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12
+                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12 ++ s13 ++ s14
 
                             iterateIndex lsbm ix msg conn 
                     opt | hasPrefix "n" opt -> do
@@ -980,14 +1012,14 @@ iterateIndex lsbm ix cx conn = do
                 let opt = head ls
                 case opt of
                     opt | hasPrefix "-dall" opt -> do
-                            let cx = filter (>= 0) $ map (\x -> case let n = read x :: Int 
+                            let da = filter (>= 0) $ map (\x -> case let n = read x :: Int 
                                                                      in M.lookup n kvMap of
                                                                          Just k -> k
                                                                          Nothing -> -1
                                                          ) $ tail ls 
                             pp "len arr > 1"
-                            pre cx 
-                            deleteURLAllId cx conn 
+                            pre da 
+                            deleteURLAllId da conn 
                             iterateIndex lsbm ix [] conn
                         | hasPrefix "-dr" opt -> do
                             let minPid = case M.lookup (read $ (head . tail) ls :: Int) kvMap  of
@@ -1070,25 +1102,48 @@ helpMe = do
   where
     pr = printBox 2
 
+
 main = do
         args <- getArgs
         pre args
+        let backupDir = "dbbackup"
         home <- getEnv "HOME"
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
-        pp $ "Generate html => " ++ htmlFile
-        let dbFile = bmfile home
-        let ln = len args
-        -- let inputFunc = getInputLine
-        conn <- open dbFile
-        ffBookMarkAll <- queryURLAndTitle [] [] conn 
-        let ls = partList 20 ffBookMarkAll
-        iterateIndex ls 0 [] conn 
-
-
-
-
-
-
+        osName <- getOS
+        pre osName
+        confMap <- readConfig configFile
+        let mayMap = MS.lookup osName confMap
+        case MS.lookup osName confMap >>= MS.lookup "db_bookmark" of
+            Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
+            Just dbFile -> do
+                pp $ "Generate html => " ++ htmlFile
+                backup dbFile backupDir
+                pre dbFile
+                let ln = len args
+                -- let inputFunc = getInputLine
+                conn <- open dbFile
+                ffBookMarkAll <- queryURLAndTitle [] [] conn 
+                let ls = partList 20 ffBookMarkAll
+                let lsMsg = [dbFile]
+                iterateIndex ls 0 [] conn 
+{-|
+        case mayMap of
+            Nothing -> error "config.txt does not contain a valid os name such as Darwin, Linux etc."
+            Just osMap -> do
+                case MS.lookup "db_bookmark" osMap of
+                    Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
+                    Just dbFile -> do
+                        pp $ "Generate html => " ++ htmlFile
+                        backup dbFile backupDir
+                        pre dbFile
+                        when True $ do
+                            let ln = len args
+                            -- let inputFunc = getInputLine
+                            conn <- open dbFile
+                            ffBookMarkAll <- queryURLAndTitle [] [] conn 
+                            let ls = partList 20 ffBookMarkAll
+                            iterateIndex ls 0 [] conn 
+-}
 
 
 

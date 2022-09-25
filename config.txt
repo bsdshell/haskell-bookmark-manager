@@ -1,0 +1,5 @@
+os = Darwin
+-- /Users/aaa/Library/Application Support/Firefox/Profiles/sk75a0xs.default-release-1/places.sqlite
+-- places.sqlite is copied from Firefox App dir
+-- When Firefox is running, places.sqlite is locked. Other process CAN NOT open/access the db file.
+db_bookmark = /Users/aaa/myfile/github/notshare/places.sqlite
