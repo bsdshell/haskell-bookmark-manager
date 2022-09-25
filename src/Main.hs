@@ -882,9 +882,9 @@ iterateIndex lsbm ix lsMsg conn = do
         mapM_ putStrLn lsMsg
     
     -- setCursorPos 30 5 
-    let lc ln cn = "\x1b[" ++ (show ln) ++ ";" ++ (show cn) ++ "H"
+    -- let lc ln cn = "\x1b[" ++ (show ln) ++ ";" ++ (show cn) ++ "H"
 
-    putStrLn $ lc 50 5
+    putStrLn $ setCursorPosStr 50 5
     putStr "ENTER "
     cmd <- getLineFlush
     -- loopPage tuplePage cmd conn 
