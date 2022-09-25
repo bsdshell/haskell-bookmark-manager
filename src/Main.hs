@@ -1106,26 +1106,29 @@ helpMe = do
 main = do
         args <- getArgs
         pre args
-        let backupDir = "dbbackup"
         home <- getEnv "HOME"
+        let backupDir = home </> "myfile/github/notshare/firefox_bookmark_db"
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
-        osName <- getOS
+        osName <- getOS  -- "macOS => Darwin"
         pre osName
         confMap <- readConfig configFile
         let mayMap = MS.lookup osName confMap
-        case MS.lookup osName confMap >>= MS.lookup "db_bookmark" of
-            Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
-            Just dbFile -> do
-                pp $ "Generate html => " ++ htmlFile
-                backup dbFile backupDir
-                pre dbFile
-                let ln = len args
-                -- let inputFunc = getInputLine
-                conn <- open dbFile
-                ffBookMarkAll <- queryURLAndTitle [] [] conn 
-                let ls = partList 20 ffBookMarkAll
-                let lsMsg = [dbFile]
-                iterateIndex ls 0 [] conn 
+        case mayMap of
+            Nothing -> error "Can find OS name"
+            Just maydbPath -> do 
+                case MS.lookup "db_bookmark" maydbPath of
+                    Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
+                    Just dbFile -> do
+                        pp $ "Generate html => " ++ htmlFile
+                        backup dbFile backupDir
+                        pre dbFile
+                        let ln = len args
+                        -- let inputFunc = getInputLine
+                        conn <- open dbFile
+                        ffBookMarkAll <- queryURLAndTitle [] [] conn 
+                        let ls = partList 20 ffBookMarkAll
+                        let lsMsg = [dbFile]
+                        iterateIndex ls 0 [] conn 
 {-|
         case mayMap of
             Nothing -> error "config.txt does not contain a valid os name such as Darwin, Linux etc."
