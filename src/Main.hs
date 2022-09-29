@@ -881,9 +881,6 @@ iterateIndex lsbm ix lsMsg conn = do
     when (not . null $ lsMsg) $ do
         mapM_ putStrLn lsMsg
     
-    -- setCursorPos 30 5 
-    -- let lc ln cn = "\x1b[" ++ (show ln) ++ ";" ++ (show cn) ++ "H"
-
     putStrLn $ setCursorPosStr 50 5
     putStr "ENTER "
     cmd <- getLineFlush
@@ -1107,6 +1104,13 @@ main = do
         args <- getArgs
         pre args
         home <- getEnv "HOME"
+
+        -- Wed 28 Sep 23:07:11 2022 
+        -- Symbolic link run the binary bm but confit.txt can not be found.
+        -- FIXED: cd dir to where the project is installed.  root/haskell-bookmark-manager
+        bmPath <- getEnv "ff" >>= \x -> return $ x </> "mybin" </> "haskell-bookmark-manager"
+        cd bmPath
+
         let backupDir = home </> "myfile/github/notshare/firefox_bookmark_db"
         htmlFile <- getEnv "g" >>= \x -> return $ x </> "notshare/bookmark.html"
         osName <- getOS  -- "macOS => Darwin"
@@ -1114,7 +1118,7 @@ main = do
         confMap <- readConfig configFile
         let mayMap = MS.lookup osName confMap
         case mayMap of
-            Nothing -> error "Can find OS name"
+            Nothing -> error "Can NOT find OS name"
             Just maydbPath -> do 
                 case MS.lookup "db_bookmark" maydbPath of
                     Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
@@ -1129,30 +1133,3 @@ main = do
                         let ls = partList 20 ffBookMarkAll
                         let lsMsg = [dbFile]
                         iterateIndex ls 0 [] conn 
-{-|
-        case mayMap of
-            Nothing -> error "config.txt does not contain a valid os name such as Darwin, Linux etc."
-            Just osMap -> do
-                case MS.lookup "db_bookmark" osMap of
-                    Nothing -> error "Can not find firefox bookmark sqlite file path => Please check your config.txt file."
-                    Just dbFile -> do
-                        pp $ "Generate html => " ++ htmlFile
-                        backup dbFile backupDir
-                        pre dbFile
-                        when True $ do
-                            let ln = len args
-                            -- let inputFunc = getInputLine
-                            conn <- open dbFile
-                            ffBookMarkAll <- queryURLAndTitle [] [] conn 
-                            let ls = partList 20 ffBookMarkAll
-                            iterateIndex ls 0 [] conn 
--}
-
-
-
-
-
-
-
-
-

@@ -54,7 +54,8 @@ getpwd
 # getName -> $ff/mybin/getName  is Haskell code
 mybin=$HOME/myfile/mybin
 fname=$(getName $PWD)
-dir="${fname}Bin"
+rootdir=$(getName $PWD)
+dir="${fname}"
 bindir="$mybin/$dir"
 
 printc 200 "[fname=$fname]"
@@ -69,12 +70,20 @@ echo "install.sh un          => uninstall"
 if [[ "$#" -eq 2 ]]; then
     if [[ "$1" == "in" ]]; then
         mkdir $bindir 
-        stack install --local-bin-path $bindir 
-        cp ./config.txt $bindir 
+
+        cd $g
+        rsync -Lav --exclude '.git'                                         \
+                   --exclude '.stack-work'                                  \
+                   haskell-bookmark-manager/ $bindir
+
+
+        cd $rootdir
+        # stack install --local-bin-path $bindir 
+
         ls -lah $bindir
 
-        cd $sym
-        rm $sym/$fname
+
+        echo "fname=$fname"
 
         ln -s $bindir/$fname $2
         echo "=>$bindir/$fname"
@@ -82,14 +91,35 @@ if [[ "$#" -eq 2 ]]; then
         ls -lah $mybin
         ls -lah $sym | grep $fname
 
+        stack build $fname 
+        # Find exec file path
+        execPath=$(stack path --local-install-root)
+        execFile="$execPath/bin/$fname"
+        ret=$(fileExist $execFile)
+
+        if [[ "$ret" -eq 0 ]]; then
+            ftime=$(fileTimeName "$execFile")
+            printcText "$ftime => $execFile"
+            cd $sym
+            if [[ -e $sym/$2 ]]; then
+                printc 100 "File Exist: $sym/$2 "
+                printc 200 "Enter y to replace it"
+                read input
+                if [[ "$input" == 'y' ]]; then
+                    ln -s "$execFile" $2
+                else 
+                    printc 88 "Do nothing"
+                fi
+            else
+                ln -s "$execFile" $2
+            fi  
+        else 
+            printBox 2 "$execFile" 
+            printBox 2 "haskellwebapp2 not found"
+        fi
+
         exit_success
     elif [[ "$1" == "un" ]]; then
-        rm -rf $bindir
-        cd $sym
-        rm $sym/$fname
-
-        printc 200 "remove $bindir"
-        printc 200 "remove $sym/$fname"
         exit_success 
     else 
         printc 300 "Unsupported option"
@@ -100,9 +130,11 @@ elif [[ "$#" -eq 1 ]]; then
 
     if [[ "$1" == "in" ]]; then
         mkdir $bindir 
-        stack install --local-bin-path $bindir 
-        cp ./config.txt $bindir 
-        ls -lah $bindir
+
+        cd $g
+        rsync -Lav --exclude '.git'                                         \
+                   --exclude '.stack-work'                                  \
+                   haskell-bookmark-manager/ $bindir
 
         cd $sym
         rm $sym/$fname

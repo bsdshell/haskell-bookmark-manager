@@ -1,0 +1,1 @@
+/Users/aaa/myfile/mybin/haskell-bookmark-manager/haskell-bookmark-manager
