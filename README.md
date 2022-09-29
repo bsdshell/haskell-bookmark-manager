@@ -102,5 +102,10 @@ CREATE INDEX urlHashes ON urls(hash);
 * Delete URL name contains matched pattern
 * Delete title name contains matched pattern
 
+## Add config.txt file for sqlite database location
+```
+    $g/notshare/*
+```
+
 
 
