@@ -107,5 +107,28 @@ CREATE INDEX urlHashes ON urls(hash);
     $g/notshare/*
 ```
 
+## Update: Sun  5 Mar 20:23:59 2023 
+### Added search on URL OR Title
+### Fixed bug on the Sqlite3 query 
 
+
+``` haskell
+  -- Wrong Query
+  qs = "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE (P.url IS NOT NULL AND P.url LIKE ?) OR (P.title LIKE ?) GROUP BY P.id ORDER BY B.dateAdded DESC;"
+
+  P.title => B.title
+
+  -- Fixed Query
+  qs = "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE (P.url IS NOT NULL AND P.url LIKE ?) OR (B.title LIKE ?) GROUP BY P.id ORDER BY B.dateAdded DESC;"
+
+```
+
+* Both table `moz_places` and `moz_bookmarks` contain `title`
+* `title` in `moz_bookmarks` should be USED, Not in `moz_places`
+```sql
+CREATE TABLE moz_places (   id INTEGER PRIMARY KEY, url LONGVARCHAR, title LONGVARCHAR, rev_host LONGVARCHAR, visit_count INTEGER DEFAULT 0, hidden INTEGER DEFAULT 0 NOT NULL, typed INTEGER DEFAULT 0 NOT NULL, frecency INTEGER DEFAULT -1 NOT NULL, last_visit_date INTEGER , guid TEXT, foreign_count INTEGER DEFAULT 0 NOT NULL, url_hash INTEGER DEFAULT 0 NOT NULL , description TEXT, preview_image_url TEXT, origin_id INTEGER REFERENCES moz_origins(id), site_name TEXT);
+
+CREATE TABLE moz_bookmarks (  id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER DEFAULT NULL, parent INTEGER, position INTEGER, title LONGVARCHAR, keyword_id INTEGER, folder_type TEXT, dateAdded INTEGER, lastModified INTEGER, guid TEXT, syncStatus INTEGER NOT NULL DEFAULT 0, syncChangeCounter INTEGER NOT NULL DEFAULT 1);
+
+```
 
