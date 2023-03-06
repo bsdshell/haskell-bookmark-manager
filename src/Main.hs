@@ -144,6 +144,9 @@ NOTE:
 
 Delete title contains string using LIKE, IN:
     DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));
+
+NOTE: Database file is in config.txt
+      db_bookmark = /Users/aaa/myfile/github/notshare/places.sqlite
 -}
   
 -- BEG_FFurls
@@ -329,6 +332,7 @@ deleteURLFromId (minPid,  maxPid) conn = do
         return ()
 
 {-|
+    === KEY: Delete a list of Id
     * Delete row from urls table
     * Delete row from list of primary ids from urls table
 
@@ -461,19 +465,53 @@ queryBookMarkInfoX us ts dbFile = do
                           ↑ 
                           + → des - cent
                             
+    ts = title 
+    us = url
 -}
 queryURLAndTitle::String -> String -> Connection -> IO[FFBookMarkAll]
 queryURLAndTitle us ts conn = do 
+        -- ts' => title
         let ts' = if (not . null) ts then "%" + ts + "%" else "%"
+        -- us' => url
         let us' = if (not . null) us then "%" + us + "%" else "%" 
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId WHERE U.url LIKE ? AND X.title LIKE ? GROUP BY U.id;"}
-        let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND P.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;"}
+        let qStr = Query {fromQuery = toSText $ qs}
+        --                                                                                                                                                                         ↑                  ↑  
+        --                                                                                                                                                                        us'                 ts'
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id;"}
         ffBookMarkAll <- query conn qStr (us', ts') ::IO [FFBookMarkAll]
         -- ffBookMarkAll <- query conn qStr () ::IO [FFBookMarkAll]
         return ffBookMarkAll 
     where
       (+) = (++)
+      qs = "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND B.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;"
+
+{-|
+    Check URL or title contains input str
+
+    ts = title 
+    us = url
+-}
+queryURLOrTitle::String -> String -> Connection -> IO[FFBookMarkAll]
+queryURLOrTitle us ts conn = do 
+        -- us' => url 
+        fw "us"
+        pre us
+        fw "ts"
+        pre ts
+        let us' = if (not . null) us then "%" + us + "%" else "%"
+        -- ts' => title 
+        let ts' = if (not . null) ts then "%" + ts + "%" else "%"
+        let qStr = Query {fromQuery = toSText $ qs}
+        --                                                                                                                                                                         ↑                 ↑  
+        --                                                                                                                                                                        us'                ts'
+        ffBookMarkAll <- query conn qStr (us', ts') ::IO [FFBookMarkAll]
+        prex ffBookMarkAll
+        return ffBookMarkAll 
+    where
+      (+) = (++)
+      qs = "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE (P.url IS NOT NULL AND P.url LIKE ?) OR (B.title LIKE ?) GROUP BY P.id ORDER BY B.dateAdded DESC;"
+      -- qs = "SELECT P.id, P.url, CASE trim(B.title) WHEN NULL THEN 'BAD' WHEN '' THEN 'empty' ELSE B.title END, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE (P.url IS NOT NULL AND P.url LIKE '%math%' ) OR (B.title LIKE '%math%') GROUP BY P.id ORDER BY B.dateAdded DESC;"
 
 {-|
 
@@ -491,8 +529,8 @@ queryURLNewest::Int -> Connection -> IO[FFBookMarkAll]
 queryURLNewest n conn = do
         let n' = fromIntegral n :: Int64
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id ORDER BY X.dateAdded ASC LIMIT ?;"}
-        let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk GROUP BY P.id ORDER BY B.dateAdded DESC LIMIT ?;"}
-        -- let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON 2 = 2 LIMIT ?;"}
+        let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk GROUP BY P.id ORDER BY B.dateAdded DESC LIMIT ?;"}
+        -- let qStr = Query {fromQuery = toSText $ "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON 2 = 2 LIMIT ?;"}
         -- let qStr = Query {fromQuery = toSText $ "SELECT U.id, U.url, X.title, X.dateAdded, U.hash FROM urls U INNER JOIN items X ON U.id = X.urlId GROUP BY U.id;"}
         -- ffBookMarkAll <- query conn qStr (Only(n)) ::IO [FFBookMarkAll]
         -- ffBookMarkAll <- query conn qStr (Only n) :: IO [(Int, TS.Text, TS.Text, Int, Int)]
@@ -582,17 +620,16 @@ printURL ts = do
    red = colorfgStr 9
    (+) = (++)
 
+{-|
+-}
 loopPage:: [(Int, FFBookMarkAll)] -> String -> Connection -> IO() 
 loopPage ss cmd conn = do
     clear
-
-
     let urlTuple = map (\(ix, bm) -> let pId = (fromIntegral . ttIdx) bm :: Int
                                          url = toStr $ ffURLx bm 
                                          title = toStr $ ffTitlex bm 
                                      in  (ix, pId, url, title)
                    ) ss
-
 
     setCursorPos 6 0 
     putStrLn $ toRightStr 10 ++ "Len=" + (show . len) ss
@@ -669,7 +706,7 @@ loopPage ss cmd conn = do
                 pp ""
 
             | hasPrefix "-u" var -> do
-                -- Title matches input
+                -- URL matches input
                 pp $ "input -u =>" ++ var 
                 let input = last $ splitSPC var
                 pp var 
@@ -677,6 +714,15 @@ loopPage ss cmd conn = do
                 let tt = zip [0..] ffBookMarkAll
                 loopPage tt cmd conn 
                 pp ""
+
+            | hasPrefix "-b" var -> do
+                -- Title or URL matches input
+                pp $ "input -b =>" ++ var 
+                let input = last $ splitSPC var
+                pp var 
+                ffBookMarkAll <- queryURLOrTitle input input conn 
+                let tt = zip [0..] ffBookMarkAll
+                loopPage tt cmd conn 
 
             | hasPrefix "-ne" var -> do
                 let s = last $ splitSPC var
@@ -907,7 +953,7 @@ iterateIndex lsbm ix lsMsg conn = do
                                           s12 = [ri ++ "backup dir   → " ++ backupDir]
                                           s13 = [ri ++ "db path"]
                                           s14 = [ri ++ "UPDATE: Sat 24 Sep 23:11:22 2022"]
-                                          ri = toRightStr 10
+                                          ri = toRightStr 20
                                       in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12 ++ s13 ++ s14
 
                             iterateIndex lsbm ix msg conn 
@@ -974,6 +1020,15 @@ iterateIndex lsbm ix lsMsg conn = do
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
                             iterateIndex lsffBookMarkAll 0 [] conn 
 
+                        | hasPrefix "-b" opt -> do
+                            -- Title matches input
+                            pp $ "input -b =>" ++ opt 
+                            let input = last ls 
+                            -- xx1
+                            ffBookMarkAll <- queryURLOrTitle input input conn 
+                            let lsffBookMarkAll = partList 20 ffBookMarkAll
+                            iterateIndex lsffBookMarkAll 0 [] conn 
+
                         | hasPrefix "-du" opt -> do
                             -- Delete URL matches input
                             let input = last ls 
@@ -1005,10 +1060,11 @@ iterateIndex lsbm ix lsMsg conn = do
                         | otherwise -> do
                             pp "ow"
                 iterateIndex lsbm ix [] conn
-           | ln == 3 -> do
+           | ln >= 3 -> do
                 let opt = head ls
                 case opt of
                     opt | hasPrefix "-dall" opt -> do
+                            --  -dall 0 1 2
                             let da = filter (>= 0) $ map (\x -> case let n = read x :: Int 
                                                                      in M.lookup n kvMap of
                                                                          Just k -> k
@@ -1016,6 +1072,7 @@ iterateIndex lsbm ix lsMsg conn = do
                                                          ) $ tail ls 
                             pp "len arr > 1"
                             pre da 
+                            logFileG ["primarykey=>", show da]
                             deleteURLAllId da conn 
                             iterateIndex lsbm ix [] conn
                         | hasPrefix "-dr" opt -> do
