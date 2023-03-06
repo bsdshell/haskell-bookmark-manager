@@ -940,21 +940,22 @@ iterateIndex lsbm ix lsMsg conn = do
                     opt | hasPrefix "-h" opt -> do
                             home <- getEnv "HOME"
                             let msg = let s1  = [ri ++ "-h           → Help Menu"]
-                                          s2  = [ri ++ "-t str       → List title contains str"]
-                                          s3  = [ri ++ "-u str       → List URL contains str"]
-                                          s4  = [ri ++ "-du str      → Delete URL contains str"]
-                                          s5  = [ri ++ "-dall 1 2 3  → Delete all 1 2 3 rows"]
-                                          s6  = [ri ++ "-de 1        → Delete one rows"]
-                                          s7  = [ri ++ "-dr 1 3      → Delete rows from 1 to 3"]
-                                          s8  = [ri ++ "-ne 10       → Query the newest 10 rows"]
-                                          s9  = [ri ++ "all          → Show all"]
-                                          s10 = [ri ++ "n            → Next page"]
-                                          s11 = [ri ++ "p            → Previous page"]
-                                          s12 = [ri ++ "backup dir   → " ++ backupDir]
-                                          s13 = [ri ++ "db path"]
-                                          s14 = [ri ++ "UPDATE: Sat 24 Sep 23:11:22 2022"]
+                                          s2  = [ri ++ "-b str       → List title OR URL contains str"]
+                                          s3  = [ri ++ "-t str       → List title contains str"]
+                                          s4  = [ri ++ "-u str       → List URL contains str"]
+                                          s5  = [ri ++ "-du str      → Delete URL contains str"]
+                                          s6  = [ri ++ "-dall 1 2 3  → Delete all 1 2 3 rows"]
+                                          s7  = [ri ++ "-de 1        → Delete one rows"]
+                                          s8  = [ri ++ "-dr 1 3      → Delete rows from 1 to 3"]
+                                          s9  = [ri ++ "-ne 10       → Query the newest 10 rows"]
+                                          s10 = [ri ++ "all          → Show all"]
+                                          s11 = [ri ++ "n            → Next page"]
+                                          s12 = [ri ++ "p            → Previous page"]
+                                          s13 = [ri ++ "backup dir   → " ++ backupDir]
+                                          s14 = [ri ++ "db path"]
+                                          s15 = [ri ++ "UPDATE: Sat 24 Sep 23:11:22 2022"]
                                           ri = toRightStr 20
-                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12 ++ s13 ++ s14
+                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12 ++ s13 ++ s14 ++ s15
 
                             iterateIndex lsbm ix msg conn 
                     opt | hasPrefix "n" opt -> do
