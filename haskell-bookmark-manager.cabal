@@ -102,6 +102,7 @@ executable             haskell-bookmark-manager
                        juicy-draw,
                        primitive,
                        orthotope,
-                       ascii-char
+                       ascii-char,
+                       stm
 
 

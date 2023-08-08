@@ -131,4 +131,7 @@ CREATE TABLE moz_places (   id INTEGER PRIMARY KEY, url LONGVARCHAR, title LONGV
 CREATE TABLE moz_bookmarks (  id INTEGER PRIMARY KEY, type INTEGER, fk INTEGER DEFAULT NULL, parent INTEGER, position INTEGER, title LONGVARCHAR, keyword_id INTEGER, folder_type TEXT, dateAdded INTEGER, lastModified INTEGER, guid TEXT, syncStatus INTEGER NOT NULL DEFAULT 0, syncChangeCounter INTEGER NOT NULL DEFAULT 1);
 
 ```
-
+## Tue  8 Aug 10:16:59 2023 
+## Refactor:
+* Move input text up a few rows to fix the console
+* Remove `perx` function from `Main.hs` because `prex` uses newer resolver which is NOT been used in `AronModule.hs`

@@ -37,6 +37,9 @@ import qualified Data.Map.Strict as M
 import qualified Data.HashMap.Strict as MS
 
 import qualified Text.Regex.TDFA as TD
+import Control.Monad.STM
+import Control.Concurrent.STM.TVar
+
 
 --import Data.Array
 
@@ -60,13 +63,12 @@ import           Database.SQLite.Simple.Ok
 import           System.Console.Haskeline
 import AronModule
 import AronAlias
+import AronDevLib
   
-sw = show
+-- sw = show
 
 -- zo - open
 -- za - close
-
-
    
 {-|
 instance ToRow Image where
@@ -147,6 +149,12 @@ Delete title contains string using LIKE, IN:
 
 NOTE: Database file is in config.txt
       db_bookmark = /Users/aaa/myfile/github/notshare/places.sqlite
+
+    UPDATE: Sun Mar  5 22:39:19 2023 
+    FIXED: Bug in sqlite3 query using wrong title on different table 
+    COMMIT: https://github.com/bsdshell/haskell-bookmark-manager/commit/7723ac7920b38a2f70d317efce1058320561f1e0
+    SEE: https://github.com/bsdshell/haskell-bookmark-manager
+
 -}
   
 -- BEG_FFurls
@@ -487,26 +495,28 @@ queryURLAndTitle us ts conn = do
       qs = "SELECT P.id, P.url, B.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND B.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;"
 
 {-|
-    Check URL or title contains input str
+    KEY: Check if URL or title contains input str
 
     ts = title 
     us = url
+
+    FIXED: Bug in sqlite3 query using wrong title on different table 
+    COMMIT: https://github.com/bsdshell/haskell-bookmark-manager/commit/7723ac7920b38a2f70d317efce1058320561f1e0
+    SEE: https://github.com/bsdshell/haskell-bookmark-manager
 -}
 queryURLOrTitle::String -> String -> Connection -> IO[FFBookMarkAll]
 queryURLOrTitle us ts conn = do 
         -- us' => url 
-        fw "us"
         pre us
-        fw "ts"
         pre ts
         let us' = if (not . null) us then "%" + us + "%" else "%"
         -- ts' => title 
         let ts' = if (not . null) ts then "%" + ts + "%" else "%"
         let qStr = Query {fromQuery = toSText $ qs}
-        --                                                                                                                                                                         ↑                 ↑  
-        --                                                                                                                                                                        us'                ts'
+        --                                                          
+        --                                                         
         ffBookMarkAll <- query conn qStr (us', ts') ::IO [FFBookMarkAll]
-        prex ffBookMarkAll
+        -- prex ffBookMarkAll
         return ffBookMarkAll 
     where
       (+) = (++)
@@ -606,19 +616,30 @@ isAllDigit::String -> Bool
 isAllDigit s = len s > 0 && (foldr (\a b -> a && b) True $ map (\x -> isDigit x) s)
 
 
+{-|
+    === print url
+
+    UPDATE: Mon Mar  6 23:00:43 2023 
+            NOT Show pID 
+-}
 printURL::[(Int, Int, String, String)] -> IO()
 printURL ts = do
     mapM_ (\(ix, pId, url, title) -> do
                                         let color = colorfgStr
-                                        let s = url + (red " → ") + title 
+                                        let url' = len url > urllen ? take urllen url $ url
+                                        let s = url' + (red " → ") + title 
                                         let s' = colorfgStr 10 s 
                                         let pix = let cx = show ix in len cx == 1 ? cx + " " $ cx
-                                        putStr $ "[" + pix + "] [" + (show pId) + "]"
+                                        -- Mon Mar  6 22:55:38 2023 
+                                        -- NOT SHOW pID 
+                                        -- putStr $ "[" + pix + "] [" + (show pId) + "]"
+                                        putStr $ "[" + pix + "] " 
                                         if mod ix 2 == 0 then putStrLn s else putStrLn s'
           ) ts
   where
    red = colorfgStr 9
    (+) = (++)
+   urllen = 80
 
 {-|
 -}
@@ -870,6 +891,19 @@ cursorToLeftCol n = do
 mySettings :: Settings IO
 mySettings = defaultSettings {historyFile = Just "myhist"}
 
+data MutableRecord = MutableRecord {
+                     currOption :: String
+                    ,currMsg :: String
+                    } deriving (Show)
+
+
+setcurrMsg :: MutableRecord -> String -> MutableRecord
+setcurrMsg record s = MutableRecord{currOption = currOption record, currMsg = s}
+  
+setcurrOption :: MutableRecord -> String -> MutableRecord
+setcurrOption record s = MutableRecord{currOption = s, currMsg = currMsg record}
+  
+  
 {-|
     === KEY: backup file
 
@@ -892,8 +926,8 @@ backup dbFile newDir = do
         mkdir newDir
     cp dbFile (newDir </> newName)
 
-iterateIndex::[[FFBookMarkAll]] -> Int -> [String] -> Connection -> IO()
-iterateIndex lsbm ix lsMsg conn = do
+iterateIndex::[[FFBookMarkAll]] -> Int -> [String] -> Connection -> TVar MutableRecord -> IO()
+iterateIndex lsbm ix lsMsg conn tvar = do
     clear
     setCursorPos 10 0 
 
@@ -924,15 +958,27 @@ iterateIndex lsbm ix lsMsg conn = do
     printURL urlTuple
     cursorDownLine 5 
 
+    -- Input text at the bottom
+    let inputRow = 46
+
     when (not . null $ lsMsg) $ do
         mapM_ putStrLn lsMsg
     
-    putStrLn $ setCursorPosStr 50 5
+    cursorToLC inputRow 5
+    record <- atomically $ readTVar tvar
+    putStr $ currOption record
+    cursorToLC (inputRow - 1) 5
+    putStr $ currMsg record
+  
+    cursorToLC (inputRow - 2) 5
     putStr "ENTER "
+    cursorToLC (inputRow - 3) 5
     cmd <- getLineFlush
+
+
     -- loopPage tuplePage cmd conn 
 
-    let ls = splitSPC cmd 
+    let ls = splitSPC cmd
     case len ls of
         ln | ln == 1 -> do
                 let opt = head ls
@@ -955,28 +1001,28 @@ iterateIndex lsbm ix lsMsg conn = do
                                           s14 = [ri ++ "db path"]
                                           s15 = [ri ++ "UPDATE: Sat 24 Sep 23:11:22 2022"]
                                           ri = toRightStr 20
-                                      in s1 ++ s2 ++ s3 ++ s4 ++ s5 ++ s6 ++ s7 ++ s8 ++ s9 ++ s10 ++ s11 ++ s12 ++ s13 ++ s14 ++ s15
+                                      in foldr (++) [] $ [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15]
 
-                            iterateIndex lsbm ix msg conn 
+                            iterateIndex lsbm ix msg conn tvar
                     opt | hasPrefix "n" opt -> do
                             pp $ "Next Page (ix + 1) =>" ++ (show $ ix + 1)
                             if (ix + 1 < len lsbm) then do
-                                iterateIndex lsbm (ix + 1) [] conn 
+                                iterateIndex lsbm (ix + 1) [] conn tvar
                             else do    
-                                iterateIndex lsbm ix [] conn 
+                                iterateIndex lsbm ix [] conn tvar
 
                     opt | hasPrefix "p" opt -> do
                             pp $ "Previous Page (ix - 1) =>" ++ (show $ ix - 1)
                             if (0 <= ix - 1) then do
-                                iterateIndex lsbm (ix - 1) [] conn 
+                                iterateIndex lsbm (ix - 1) [] conn tvar
                             else do
-                                iterateIndex lsbm ix [] conn 
+                                iterateIndex lsbm ix [] conn tvar
 
                         | hasPrefix "all" opt -> do
                             ffBookMarkAll <- queryURLAndTitle [] [] conn 
                             let lss = partList 20 ffBookMarkAll
                             -- iterateBookMark ffBookMarkAll dbFile
-                            iterateIndex lss 0 [] conn 
+                            iterateIndex lss 0 [] conn tvar
 
                         | isAllDigit opt -> do
                             -- Open Browser from url
@@ -990,18 +1036,24 @@ iterateIndex lsbm ix lsMsg conn = do
 
                                 putStrLn $ "title=" ++ title ++ " " ++ url 
                                 sys $ "open " ++ url
-                                iterateIndex lsbm ix [] conn
+                                iterateIndex lsbm ix [] conn tvar
                                 -- loopPage ss cmd conn 
                             else do
-                                pp $ "Invalid Index => 999" ++ sw inx
-                                iterateIndex lsbm ix [] conn
+                                let s = "Invalid Index => " ++ sw inx
+                                pp s 
+                                record <- atomically $ readTVar tvar
+                                atomically $ writeTVar tvar $ setcurrMsg record s
+                                iterateIndex lsbm ix [] conn tvar
 
                         | hasPrefix "q" opt -> do 
                             -- quit
                             return ()
                         | otherwise -> do
-                            pp $ "Invalid 1 argument ix =>" ++ (show ix)
-                            iterateIndex lsbm ix [] conn 
+                            let s = "TVar Invalid 1 argument ix => " ++ (show ix)
+                            record <- atomically $ readTVar tvar
+                            atomically $ writeTVar tvar $ setcurrMsg record s
+                            -- pp $ "Invalid 1 argument ix =>" ++ (show ix)
+                            iterateIndex lsbm ix [] conn tvar
            | ln == 2 -> do
                 let opt = head ls
                 case opt of
@@ -1011,7 +1063,7 @@ iterateIndex lsbm ix lsMsg conn = do
                             let input = last ls 
                             ffBookMarkAll <- queryURLAndTitle input [] conn 
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
-                            iterateIndex lsffBookMarkAll 0 [] conn 
+                            iterateIndex lsffBookMarkAll 0 [] conn tvar
 
                         | hasPrefix "-t" opt -> do
                             -- Title matches input
@@ -1019,7 +1071,7 @@ iterateIndex lsbm ix lsMsg conn = do
                             let input = last ls 
                             ffBookMarkAll <- queryURLAndTitle [] input conn 
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
-                            iterateIndex lsffBookMarkAll 0 [] conn 
+                            iterateIndex lsffBookMarkAll 0 [] conn tvar
 
                         | hasPrefix "-b" opt -> do
                             -- Title matches input
@@ -1028,7 +1080,7 @@ iterateIndex lsbm ix lsMsg conn = do
                             -- xx1
                             ffBookMarkAll <- queryURLOrTitle input input conn 
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
-                            iterateIndex lsffBookMarkAll 0 [] conn 
+                            iterateIndex lsffBookMarkAll 0 [] conn tvar
 
                         | hasPrefix "-du" opt -> do
                             -- Delete URL matches input
@@ -1036,7 +1088,7 @@ iterateIndex lsbm ix lsMsg conn = do
                             deleteURLMatchURL input conn 
                             ffBookMarkAll <- queryURLAndTitle input [] conn 
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
-                            iterateIndex lsffBookMarkAll 0 [] conn 
+                            iterateIndex lsffBookMarkAll 0 [] conn tvar
 
                         | hasStr "-dt" opt -> do
                             -- Delete Title matches input
@@ -1046,8 +1098,20 @@ iterateIndex lsbm ix lsMsg conn = do
                             -- Delete one row
                             let n = last ls 
                             let inx = read n :: Int64
-                            let pid = fromJust $ M.lookup (fromIntegral inx) kvMap
-                            deleteURLFromId (pid, pid) conn 
+                            let may = M.lookup (fromIntegral inx) kvMap
+                            pre may
+                            case may of
+                                 Just pid -> deleteURLFromId (pid, pid) conn
+                                 Nothing -> do
+                                   let s = "Invalid Index => " ++ show inx
+                                   record <- atomically $ readTVar tvar
+                                   pre record
+                                   -- sleepSec 10
+                                   atomically $ writeTVar tvar $ setcurrMsg record s
+                                   deleteURLFromId (0, 0) conn 
+
+                            -- let pid = fromJust $ M.lookup (fromIntegral inx) kvMap
+                            -- deleteURLFromId (pid, pid) conn 
 
 
                         | hasPrefix "-ne" opt -> do
@@ -1056,11 +1120,11 @@ iterateIndex lsbm ix lsMsg conn = do
                             let n = read s :: Int
                             ffBookMarkAll <- queryURLNewest n conn 
                             let lsffBookMarkAll = partList 20 ffBookMarkAll
-                            iterateIndex lsffBookMarkAll 0 [] conn 
+                            iterateIndex lsffBookMarkAll 0 [] conn tvar
 
                         | otherwise -> do
                             pp "ow"
-                iterateIndex lsbm ix [] conn
+                iterateIndex lsbm ix [] conn tvar
            | ln >= 3 -> do
                 let opt = head ls
                 case opt of
@@ -1075,7 +1139,7 @@ iterateIndex lsbm ix lsMsg conn = do
                             pre da 
                             logFileG ["primarykey=>", show da]
                             deleteURLAllId da conn 
-                            iterateIndex lsbm ix [] conn
+                            iterateIndex lsbm ix [] conn tvar
                         | hasPrefix "-dr" opt -> do
                             let minPid = case M.lookup (read $ (head . tail) ls :: Int) kvMap  of
                                               Just x  -> x
@@ -1091,24 +1155,26 @@ iterateIndex lsbm ix lsMsg conn = do
                             let swapT (a, b) = (b, a)
                             deleteURLFromId (swapT (minPid, maxPid)) conn 
                             --                 ↑           ↑  
-                            --                 |           + →  ORDER BY dateAdded DESC 
+                            --                 |           + →  ORDER BY dateAdded DESC (descent, ascent)
                             --                 + - - - - - + →  Need to swap (minPid, maxPid)
                             --        Pid
                             --   1 -> 003
                             --   2 -> 002
                             --   3 -> 001
-                            --
+                            --   ↑ 
+                            --   + -> Show on the screen
+                            -- 
                             -- SELECT P.id, P.url, P.title, B.dateAdded, P.url_hash FROM moz_places P INNER JOIN moz_bookmarks B ON P.id = B.fk WHERE P.url LIKE ? AND P.title LIKE ? GROUP BY P.id ORDER BY B.dateAdded DESC;
                             -- 
-                            iterateIndex lsbm ix [] conn 
+                            iterateIndex lsbm ix [] conn tvar
 
                         | otherwise -> do
                             pp "Invalid options"
-                            iterateIndex lsbm ix [] conn 
+                            iterateIndex lsbm ix [] conn tvar
 
 
            | otherwise -> do
-                iterateIndex lsbm ix [] conn 
+                iterateIndex lsbm ix [] conn tvar
                 pp "xx555"
   where
     (!) = (!!)
@@ -1190,4 +1256,6 @@ main = do
                         ffBookMarkAll <- queryURLAndTitle [] [] conn 
                         let ls = partList 20 ffBookMarkAll
                         let lsMsg = [dbFile]
-                        iterateIndex ls 0 [] conn 
+                        let mrec = MutableRecord {currOption = "currOption", currMsg = "currMsg"}
+                        tvar <- newTVarIO mrec
+                        iterateIndex ls 0 [] conn tvar
