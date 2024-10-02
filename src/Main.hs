@@ -148,7 +148,7 @@ Delete title contains string using LIKE, IN:
     DELETE FROM urls WHERE id IN (SELECT id FROM urls U WHERE U.id IN (SELECT urlId FROM items X WHERE title LIKE '%Vansky%'));
 
 NOTE: Database file is in config.txt
-      db_bookmark = /Users/aaa/myfile/github/notshare/places.sqlite
+      db_bookmark = /Users/cat/myfile/github/notshare/places.sqlite
 
     UPDATE: Sun Mar  5 22:39:19 2023 
     FIXED: Bug in sqlite3 query using wrong title on different table 

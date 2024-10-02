@@ -1,4 +1,4 @@
-#!/usr/local/bin/bash
+#!/bin/bash
 
 #================================================================================ 
 # Last Upate: Fri Oct  7 12:39:43 PDT 2016 
@@ -54,40 +54,72 @@ getpwd
 # getName -> $ff/mybin/getName  is Haskell code
 mybin=$HOME/myfile/mybin
 fname=$(getName $PWD)
-dir=${fname}
-bindir=$mybin/$dir
+rootdir=$(getName $PWD)
+dir="${fname}"
+bindir="$mybin/$dir"
 
 printc 200 "[fname=$fname]"
 printc 200 "[dir=$dir]"
 printc 200 "[bindir=$bindir]"
 
+
+echo "install.sh in          => install"
+echo "install.sh in  newname => $sym/newname -> binaryfile"
+echo "install.sh un          => uninstall"
+
 if [[ "$#" -eq 2 ]]; then
     if [[ "$1" == "in" ]]; then
         mkdir $bindir 
-        stack install --local-bin-path $bindir 
-        exeName=$(ls -A $bindir)
-        printc 200 "exeName = $exeName"
 
-        cp ./config.txt $bindir 
+        cd $g
+        rsync -Lav --exclude '.git'                                         \
+                   --exclude '.stack-work'                                  \
+                   haskell-bookmark-manager/ $bindir
+
+
+        cd $rootdir
+        # stack install --local-bin-path $bindir 
+
         ls -lah $bindir
 
-        cd $sym
-        rm $sym/$exeName
 
-        ln -s "$bindir/$exeName" "$2"
+        echo "fname=$fname"
+
+        ln -s $bindir/$fname $2
+        echo "=>$bindir/$fname"
+        
         ls -lah $mybin
-        ls -lah $sym | grep $exeName
+        ls -lah $sym | grep $fname
+
+        stack build $fname 
+        # Find exec file path
+        execPath=$(stack path --local-install-root)
+        execFile="$execPath/bin/$fname"
+        ret=$(fileExist $execFile)
+
+        if [[ "$ret" -eq 0 ]]; then
+            ftime=$(fileTimeName "$execFile")
+            printcText "$ftime => $execFile"
+            cd $sym
+            if [[ -e $sym/$2 ]]; then
+                printc 100 "File Exist: $sym/$2 "
+                printc 200 "Enter y to replace it"
+                read input
+                if [[ "$input" == 'y' ]]; then
+                    ln -s "$execFile" $2
+                else 
+                    printc 88 "Do nothing"
+                fi
+            else
+                ln -s "$execFile" $2
+            fi  
+        else 
+            printBox 2 "$execFile" 
+            printBox 2 "haskellwebapp2 not found"
+        fi
 
         exit_success
     elif [[ "$1" == "un" ]]; then
-        exeName=$(ls -A $bindir)
-
-        rm -rf $bindir
-        cd $sym
-        rm $sym/$exeName
-
-        printc 200 "remove $bindir"
-        printc 200 "remove $sym/$exeName"
         exit_success 
     else 
         printc 300 "Unsupported option"
@@ -98,38 +130,31 @@ elif [[ "$#" -eq 1 ]]; then
 
     if [[ "$1" == "in" ]]; then
         mkdir $bindir 
-        stack install --local-bin-path $bindir 
-        cp ./config.txt $bindir 
 
-        exeName=$(ls -A $bindir)
-        echo "$exeName"
+        cd $g
+        rsync -Lav --exclude '.git'                                         \
+                   --exclude '.stack-work'                                  \
+                   haskell-bookmark-manager/ $bindir
 
         cd $sym
-        rm $sym/$exeName
+        rm $sym/$fname
 
-        ln -s $bindir/$exeName $exeName 
+        ln -s $bindir/$fname $fname 
         ls -lah $mybin
-        ls -lah $sym | grep $exeName
-        msg=$(which $exeName)
-        printc 200 "which $exeName => $msg"
+        ls -lah $sym | grep $fname
 
         exit_success
     elif [[ "$1" == "un" ]]; then
-        exeName=$(ls -A $bindir)
         rm -rf $bindir
         cd $sym
-        rm $sym/$exeName
+        rm $sym/$fname
 
         printc 200 "remove $bindir"
-        printc 200 "remove $sym/$exeName"
+        printc 200 "remove $sym/$fname"
         exit_success 
     else 
         printc 300 "Unsupported option"
         exit_failure 
     fi
-else
-    echo "install.sh in          => install"
-    echo "install.sh in  newname => $sym/newname -> binaryfile"
-    echo "install.sh un          => uninstall"
 fi
 
